@@ -1,5 +1,4 @@
-import operator
-import os
+import os, sys
 from email.mime.text import MIMEText
 from sqlite3 import dbapi2 as sqlite3
 
@@ -108,7 +107,6 @@ def send_mail():
 # return redirect(url_for('show_entries'))
 
 if __name__ == "__main__":
-    import sys
     if len(sys.argv) < 2 or sys.argv[1] not in ["initdb", "run"]:
         print("Need 1 argument from (initdb, run)", file=sys.stderr)
         sys.exit(1)
