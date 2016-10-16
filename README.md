@@ -4,7 +4,7 @@ Why not being opensource about it ?
 
 ## Flask
 
-Built with the microframework (Flask|https://github.com/pallets/flask)
+Built with the microframework [Flask](https://github.com/pallets/flask)
 
 ## Run it ?
 
