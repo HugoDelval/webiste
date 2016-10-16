@@ -1,0 +1,47 @@
+{% extends "layout.html" %}
+
+{% block navcv %}active{% endblock %}
+
+{% block body %}
+{% include 'whoami.html' %}
+{% include 'skills.html' %}
+{% include 'experience.html' %}
+{% include 'education.html' %}
+
+{% include 'contact.html' %}
+{% endblock %}
+
+
+
+{% block js %}
+{{ super() }}
+<script>
+    $(document).ready(function() {
+        $("#contact-form").submit(function(event){
+            $('#send-mail').prop("disabled", true);
+            event.preventDefault();
+            $.ajax({
+               type: "POST",
+               url: "/contact",
+               data: $("#contact-form").serialize(),
+               success: function(data)
+               {
+                    var toWrite = '<div class="alert alert-dismissible alert-success"><button type="button" class="close" data-dismiss="alert">&times;</button>' + data.msg + '</div>';
+                    $('#return-ajax').html(toWrite);
+                    $('#send-mail').prop("disabled", false);
+               },
+               error: function(error)
+               {
+                    console.log(error);
+                    if(!error.responseJSON || !error.responseJSON.msg)
+                        var toWrite = '<div class="alert alert-dismissible alert-danger"><button type="button" class="close" data-dismiss="alert">&times;</button>An unknown error occurred.</div>';
+                    else
+                        var toWrite = '<div class="alert alert-dismissible alert-danger"><button type="button" class="close" data-dismiss="alert">&times;</button>' + error.responseJSON.msg + '</div>';
+                    $('#return-ajax').html(toWrite);
+                    $('#send-mail').prop("disabled", false);
+               }
+            });
+        });
+    });
+</script>
+{% endblock %}

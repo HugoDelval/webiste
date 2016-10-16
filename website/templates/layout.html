@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <title>Hugo DELVAL - DevOps - Information Security</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="author" content="Hugo DELVAL">
+    <meta name="keywords" content="Hugo DELVAL;information security;system;DevOps;developer;operator"/>
+    <meta name="description" content="Hugo DELVAL website. CV & articles"/>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/font-awesome.min.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/timeline.css') }}">
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+</head>
+<body>
+
+<nav class="navbar navbar-default" role="navigation">
+    <div class="container">
+        <div class="navbar-header">
+            <button type="button" class="navbar-toggle collapsed" data-toggle="collapse"
+                    data-target="#bs-example-navbar-collapse-1">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="/">Hugo DELVAL</a>
+        </div>
+
+        <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+            <ul class="nav navbar-nav">
+                <li class="{% block navcv %}{% endblock %}"><a href="#whoami">Who?? <span class="sr-only">(current)</span></a></li>
+                <li><a href="#skills">Skills</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<section class="page container">
+    {% for message in get_flashed_messages() %}
+    <div class="flash">
+        {{ message }}
+    </div>
+    {% endfor %}
+    {% block body %}{% endblock %}
+</section>
+
+<footer class="container-fluid">
+    <div class="row jumbotron footer text-center">
+        <a href="https://www.linkedin.com/in/hugodelval" target="_blank">
+            <div class="col-xs-1 col-xs-offset-5"><i class="fa fa-linkedin-square fa-4"></i></div>
+        </a>
+        <div class="col-xs-1 hidden-lg"></div>
+        <a href="https://github.com/HugoDelval" target="_blank">
+            <div class="col-xs-1"><i class="fa fa-github fa-4"></i></div>
+        </a>
+    </div>
+</footer>
+
+
+{% block js %}
+<script type="text/javascript" src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+{% endblock %}
+</body>
+</html>

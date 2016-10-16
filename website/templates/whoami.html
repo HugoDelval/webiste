@@ -1,0 +1,30 @@
+<section class="jumbotron" id="whoami">
+    <h1>Who am I ?</h1>
+    <div class="row">
+        <div class="col-lg-9 col-md-12 justify">
+            <p>
+                Hugo, {{age}}y-o, last year student in computer science/engineering at
+                <em><a href="https://www.insa-lyon.fr/" target="_blank">l'INSA de Lyon</a></em>.
+                I hope to work as a <b>DevOps</b> in the next future.
+            </p>
+            <p>
+                I love to build applications that have a relatively complex interaction with the
+                <b>Linux system</b> (containers / VMs / managing users...).
+            </p>
+            <p>
+                This page is an online CV where I can present my experiences and the projects I am proud of.
+                If you prefer an <a href="{{ url_for('static', filename='res/CV_HUGO_DELVAL.pdf') }}">
+                offline version, here it is.
+            </a>
+            </p>
+            <p>
+                If you want to talk (for any reason), <a href="#contact">please contact me</a>. I do not bite.
+                <small class="invisiblish">(too much)</small>
+            </p>
+        </div>
+        <div class="col-lg-3 hidden-md hidden-sm hidden-xs">
+            <img class="img-responsive" src="{{ url_for('static', filename='images/photo.png') }}" alt="photo"
+                 id="photo">
+        </div>
+    </div>
+</section>

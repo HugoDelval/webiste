@@ -1,0 +1,5 @@
+website.db
+.idea/
+*.pyc
+secrets.py
+__pycache__/

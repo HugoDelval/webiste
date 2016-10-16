@@ -1,0 +1,98 @@
+<section class="skills">
+    <h2 id="skills">Skills</h2>
+    <hr>
+    <div class="row">
+        <div class="col-xs-4 small-padding-right">
+            <div class="panel-group" id="accordionLeft" role="tablist" aria-multiselectable="true">
+                {% for skill in skills %}
+                {% if loop.index0 is divisibleby 3 %}
+                <div class="panel panel-default">
+                    <a role="button" data-toggle="collapse" data-parent="#accordionLeft"
+                       href="#collapse{{ loop.index0 }}"
+                       aria-expanded="true"
+                       aria-controls="collapse{{ loop.index0 }}">
+                        <div class="panel-heading lighthover" role="tab" id="heading{{ loop.index0 }}">
+                            <h4 class="panel-title">
+                                {{ skill.name|safe }}&nbsp;&nbsp;&nbsp;{{ skill.note*'<i class="fa fa-star"></i>' |safe
+                                }}{{
+                                (5-skill.note)*'<i class="fa fa-star-o"></i>' |safe }}
+                            </h4>
+                        </div>
+                    </a>
+                    <div id="collapse{{ loop.index0 }}" class="panel-collapse collapse" role="tabpanel"
+                         aria-labelledby="heading{{ loop.index0 }}">
+                        <div class="panel-body">
+                            {{ skill.description|safe }}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        <div class="col-xs-4 small-padding">
+            <div class="panel-group" id="accordionMiddle" role="tablist" aria-multiselectable="true">
+                {% for skill in skills %}
+                {% if (loop.index0 - 1) is divisibleby 3 %}
+                <div class="panel panel-default">
+                    <a role="button" data-toggle="collapse" data-parent="#accordionMiddle"
+                       href="#collapse{{ loop.index0 }}"
+                       aria-expanded="true"
+                       aria-controls="collapse{{ loop.index0 }}">
+                        <div class="panel-heading lighthover" role="tab" id="heading{{ loop.index0 }}">
+                            <h4 class="panel-title">
+                                {{ skill.name|safe }}&nbsp;&nbsp;&nbsp;{{ skill.note*'<i class="fa fa-star"></i>' |safe
+                                }}{{
+                                (5-skill.note)*'<i class="fa fa-star-o"></i>' |safe }}
+                            </h4>
+                        </div>
+                    </a>
+                    <div id="collapse{{ loop.index0 }}" class="panel-collapse collapse" role="tabpanel"
+                         aria-labelledby="heading{{ loop.index0 }}">
+                        <div class="panel-body">
+                            {{ skill.description|safe }}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        <div class="col-xs-4 small-padding-left">
+            <div class="panel-group" id="accordionRight" role="tablist" aria-multiselectable="true">
+                {% for skill in skills %}
+                {% if (loop.index0 - 2) is divisibleby 3 %}
+                <div class="panel panel-default">
+                    <a role="button" data-toggle="collapse" data-parent="#accordionRight"
+                       href="#collapse{{ loop.index0 }}"
+                       aria-expanded="true"
+                       aria-controls="collapse{{ loop.index0 }}">
+                        <div class="panel-heading lighthover" role="tab" id="heading{{ loop.index0 }}">
+                            <h4 class="panel-title">
+                                {{ skill.name|safe }}&nbsp;&nbsp;&nbsp;{{ skill.note*'<i class="fa fa-star"></i>' |safe
+                                }}{{
+                                (5-skill.note)*'<i class="fa fa-star-o"></i>' |safe }}
+                            </h4>
+                        </div>
+                    </a>
+                    <div id="collapse{{ loop.index0 }}" class="panel-collapse collapse" role="tabpanel"
+                         aria-labelledby="heading{{ loop.index0 }}">
+                        <div class="panel-body">
+                            {{ skill.description|safe }}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="well">
+        <p>
+            <b>Note:</b> Evaluate its own skills is quite a complicated exercise.
+            I know I'll never totally master a domain so I prefer to rank my skills between them, in a subjective way,
+            rather than in <i>percentage of mastery</i>.
+        </p>
+    </div>
+</section>

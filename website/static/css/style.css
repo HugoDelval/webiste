@@ -1,0 +1,46 @@
+.page{
+    margin-top: 25px;
+}
+
+h2{
+    padding-top: 40px;
+}
+
+.invisiblish{
+    font-size: 8px;
+    color: #4e5d6c;
+}
+
+.justify{
+    text-align: justify;
+    text-justify: inter-word;
+}
+
+div .small-padding{
+    padding-right: 2px;
+    padding-left: 1.5px;
+}
+
+div .small-padding-left{
+    padding-left: 1.5px;
+}
+
+div .small-padding-right{
+    padding-right: 2px;
+}
+
+div .lighthover:hover{
+    background-color: rgb(78, 93, 108);
+}
+div .lighthover{
+    background-color: rgb(72, 85, 99);
+}
+
+footer > .footer{
+    margin-top: 30px;
+    margin-bottom: 0;
+}
+
+div > .fa-4{
+    font-size: 6em;
+}
