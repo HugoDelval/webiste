@@ -71,6 +71,8 @@ So if we send "**flag:**" as our "**user**" then we only increase the output of 
 
 So we are able to detect if the flag starts with a letter. Then we iterate :)
 
+After a bit of searching, this is known as [a CRIME attack](https://en.wikipedia.org/wiki/CRIME).
+
 Let's automate this a little bit:
 
 ```bash
