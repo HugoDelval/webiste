@@ -1,0 +1,30 @@
+{% extends "layout.html" %}
+
+{% block navwriteups %}active{% endblock %}
+{% block css %}
+    <link rel="stylesheet" type="text/css" href="https://highlightjs.org/static/demo/styles/androidstudio.css">
+{% endblock %}
+
+
+{% block body %}
+
+<h2 class="nopadding">
+    <a href="/writeup/{{ctf}}">&#8592; Back to <b>{{ctf}}</b></a>
+</h2>
+
+<div id="writeup" class="well"></div>
+
+{% endblock %}
+
+
+{% block js %}
+{{ super() }}
+<script type="text/javascript" src="{{ url_for('static', filename='js/marked.min.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/highlight.min.js') }}"></script>
+<script type="text/javascript">
+    $(document).ready(function() {
+        document.getElementById('writeup').innerHTML = marked('{{writeup|safe}}');
+        hljs.initHighlightingOnLoad();
+    });
+</script>
+{% endblock %}

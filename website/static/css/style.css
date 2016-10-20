@@ -2,7 +2,7 @@
     margin-top: 25px;
 }
 
-h2{
+h2:not(.nopadding){
     padding-top: 40px;
 }
 
@@ -43,4 +43,8 @@ footer > .footer{
 
 div > .fa-4{
     font-size: 6em;
+}
+
+#writeup > pre{
+    padding:0;
 }

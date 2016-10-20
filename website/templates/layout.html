@@ -9,8 +9,10 @@
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/font-awesome.min.css') }}">
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/timeline.css') }}">
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+
+    {% block css %}{% endblock %}
+
 </head>
 <body>
 
@@ -29,22 +31,18 @@
 
         <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
             <ul class="nav navbar-nav">
-                <li class="{% block navcv %}{% endblock %}"><a href="#whoami">Who?? <span class="sr-only">(current)</span></a></li>
-                <li><a href="#skills">Skills</a></li>
-                <li><a href="#experiences">Experiences</a></li>
-                <li><a href="#education">Education</a></li>
-                <li><a href="#contact">Contact</a></li>
+                <li class="{% block navcv %}{% endblock %}"><a href="/#whoami">Who?? <span class="sr-only">(current)</span></a></li>
+                <li><a href="/#skills">Skills</a></li>
+                <li><a href="/#experiences">Experiences</a></li>
+                <li><a href="/#education">Education</a></li>
+                <li class="{% block navwriteups %}{% endblock %}"><a href="/writeup">Writeups</a></li>
+                <li><a href="/#contact">Contact</a></li>
             </ul>
         </div>
     </div>
 </nav>
 
 <section class="page container">
-    {% for message in get_flashed_messages() %}
-    <div class="flash">
-        {{ message }}
-    </div>
-    {% endfor %}
     {% block body %}{% endblock %}
 </section>
 

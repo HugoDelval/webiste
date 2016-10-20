@@ -1,0 +1,30 @@
+{% extends "layout.html" %}
+
+{% block navwriteups %}active{% endblock %}
+
+{% block body %}
+
+<section class="jumbotron">
+    <h1>CTFs' Writeups</h1>
+    <div class="row">
+        <div class="col-xs-12">
+            <p>
+                Played with the team <a href="https://ctftime.org/team/11869" target="_blank">InSecurity</a> (cf <a target="_blank" href="http://insecurity-insa.fr"> website</a>).
+            </p>
+        </div>
+    </div>
+</section>
+
+<section>
+    <h2 style="padding-top:10px;">List of CTFs</h2>
+    <ul class="well">
+    {% for writeup in writeups %}
+        <li>
+            <a href="/writeup/{{writeup}}">{{writeup}}</a>
+        </li>
+    {% endfor %}
+    </ul>
+</section>
+
+{% endblock %}
+
