@@ -1,6 +1,6 @@
 # Writeup for the Cornelius1's hack.lu chall
 
-**Keywords**: ruby, AES CTR, Zlib deflate
+**Keywords**: ruby, AES CTR, Zlib deflate, CRIME attack
 
 **Category**: Cryptography
 
