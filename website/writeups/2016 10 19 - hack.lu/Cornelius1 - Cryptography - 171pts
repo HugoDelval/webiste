@@ -1,0 +1,111 @@
+# Writeup for the Cornelius1's hack.lu chall
+
+**Keywords**: ruby, AES CTR, Zlib deflate
+
+**Category**: Cryptography
+
+**Points**: 171
+
+Here is the server source's code :
+
+```ruby
+require 'openssl'
+require 'webrick'
+require 'base64'
+require 'json'
+require 'zlib'
+require 'pry'
+
+def encrypt(data)
+  cipher = OpenSSL::Cipher::AES.new(128, :CTR)
+  cipher.encrypt
+  key = cipher.random_key
+  iv = cipher.random_iv
+  cipher.auth_data = ""
+  encrypted = cipher.update(data) + cipher.final
+  return encrypted
+end
+
+def get_auth(user)
+  data = [user, "flag:"+File.read("flag.key").strip]
+  json = JSON.dump(data)
+  zip = Zlib.deflate(json)
+  return Base64.strict_encode64(encrypt(zip))
+end
+
+class Srv < WEBrick::HTTPServlet::AbstractServlet
+  def do_GET(req,resp)
+    user = req.query["user"] || "fnord"
+    resp.body = "Hallo #{user}"
+    resp.status = 200
+    puts get_auth(user).inspect
+    cookie = WEBrick::Cookie.new("auth", get_auth(user))
+    resp.cookies << cookie
+    return resp
+  end
+end
+
+srv = WEBrick::HTTPServer.new({Port: 12336})
+srv.mount "/",Srv
+srv.start
+
+```
+
+The goal is to find the content of *flag.key* AKA decrypt the cookie.
+
+Here is the simplified data flow, from the user input (URL parameter *user*) to the cookie:
+
+    user + "flag:THE_FLAG" > zlib deflate > AES CTR encrypt > base64 > cookie
+
+What's wrong about it ? It is quite obvious that the user parameter has something to do with the challenge (otherwise it won't be there :p). 
+
+The first step to solve the challenge is to understand how *zlib deflate* works. From Wikipedia we learn that Deflate is based on the LZ77 algorithm. [Still from Wikipedia we learn that :](https://en.wikipedia.org/wiki/LZ77_and_LZ78#LZ77)
+
+> LZ77 algorithms achieve compression by replacing repeated occurrences of data with references to a single copy of that data existing earlier in the uncompressed data stream.
+
+So for a given length, the more "**user**" is close to the flag, the smaller the output of deflate will be.
+
+Likewise, the more the output of deflate is small, the more the cipher and the base64 are small. (There is just a little trick with the padding of the cipher, but the principle stays the same!)
+
+So if we send "**flag:**" as our "**user**" then we only increase the output of deflate of 1 byte (the alias). Likewise if the flag starts with "a" and we send "**flag:b**" as our "**user**" the output of deflate will increase of 2 bytes (the alias + b), but if we send "**flag:a**" the output will only increase of 1 byte (the alias).
+
+So we are able to detect if the flag starts with a letter. Then we iterate :)
+
+Let's automate this a little bit:
+
+```bash
+for i in {78..125}; do echo `printf "%x" ${i}` && curl -vv "https://cthulhu.fluxfingers.net:1505/?user=flag:Mu7aiched%`printf "%x" ${i}`" 2>&1 | grep Set-Cookie ; done;
+```
+
+This is an ugly bash oneliner to bruteforce an hexadecimal encoded character. This will produce the following output :
+
+```bash
+4e
+< Set-Cookie: auth=AGUPbh3BhY0W5AJNa7FI//PgmDwidVBYMj0sd2B1WHM=
+4f
+< Set-Cookie: auth=EmlgWKQIVADpABaF0Vl59v3kMBqm7KHCoLUlVNVlKwk=
+...
+62
+< Set-Cookie: auth=7NU6OjOP1JwVvsbHsod+Rw6SR/5MXhcsO0vM5aJ0rdA=
+63
+< Set-Cookie: auth=Ou76fwjxkzQTkXLVpQ5BIsuTbW6pPJ5vyC++Ph17bOQ=
+64
+< Set-Cookie: auth=1DNSu9QFtIvJEyR0zig0VDZGLbZ0D371q/jPy5SDq+U=
+65
+< Set-Cookie: auth=Ndin4BpZ/vSXdxaaQOD8F69b0zfPxmXCFrutikFQ
+66
+< Set-Cookie: auth=zZKniX/LSrN97FtvnEXRjOvJnuNPy9xiFvNuzJIe+qI=
+67
+< Set-Cookie: auth=AIj15RkMWDJo27392hFHvcQdWlQCR/G5kcOHjsoJdh4=
+...
+```
+
+We see that the character chr(0x65) results in a smaller output of the cipher, so this must be the character to concatenate to the current guessed flag ! 
+
+    Mu7aiched + e
+
+If we iterate one more time we can't find any character that reduce the length of the cipher.. That might be because we already have the whole flag. After checking the CTF's submit area it appears that it was that !
+
+So here is the final flag : **Mu7aichede** :D
+
+*Author: Hugo DELVAL*
