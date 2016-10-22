@@ -130,7 +130,7 @@ def writeup(ctf, writeup):
     if not os.path.isfile(writeup_path):
         abort(404)
     writeup = open(writeup_path).read()
-    return render_template('writeup.html', writeup=writeup.replace("\n", "\\n").replace("'", "\\'"), ctf=ctf)
+    return render_template('writeup.html', writeup=writeup.replace("\\", "\\\\").replace("\n", "\\n").replace("'", "\\'"), ctf=ctf)
 
 
 if __name__ == "__main__":

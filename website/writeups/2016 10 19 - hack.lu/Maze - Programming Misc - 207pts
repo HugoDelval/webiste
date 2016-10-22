@@ -136,7 +136,7 @@ def gotto(path):
 	res = requests.get(url + path, headers=headers)
 	try:
 		enigma = res.text.split("<br>")[1].split(" =")[0]
-		if re.match(r'^[\d* +-/]+$', enigma):
+		if re.match(r'^[\d* +/-]+$', enigma):
 			resultat = eval(enigma)
 		else:
 			print("Do not match! " + enigma)

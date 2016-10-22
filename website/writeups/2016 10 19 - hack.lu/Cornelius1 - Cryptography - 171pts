@@ -6,7 +6,7 @@
 
 **Points**: 171
 
-Here is the server source's code :
+Here is the server's source code :
 
 ```ruby
 require 'openssl'
