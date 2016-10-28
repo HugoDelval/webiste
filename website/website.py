@@ -100,7 +100,7 @@ def send_mail():
 @app.route('/writeup', methods=['GET'])
 def ctfs():
     writeups_dirs = [d for d in os.listdir("writeups") if os.path.isdir(os.path.join("writeups", d))]
-    return render_template('ctfs.html', writeups=writeups_dirs)
+    return render_template('ctfs.html', writeups=sorted(writeups_dirs, reverse=True))
 
 @app.route('/writeup/<ctf>', methods=['GET'])
 def writeup_dir(ctf):

