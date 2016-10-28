@@ -44,7 +44,7 @@ http://google.com/';echo '1
 
 Should work as expected right ? No response.. Mmmh, maybe not an RCE after all.
 
-Finally the the click ! Maybe it is a PhantomJS configuration injection ? :o
+Finally the click ! Maybe it is a PhantomJS configuration injection ? :o
 
 ### Second part : 3xploit
 
