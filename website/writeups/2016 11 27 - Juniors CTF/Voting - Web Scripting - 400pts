@@ -1,0 +1,37 @@
+# Writeup for the Just In Time's Hack The Vote chall
+
+**Keywords**: LFI, PHP, unserialize, time sensible
+
+**Category**: Web
+
+**Points**: 300
+
+> When Uncle Stan decides to run for mayor, Dipper and Mabel had to deal with the transformation of his hapless uncle in this candidate.
+
+> But anyone can enter the pre-election headquarters, just also need to get some votes...
+
+The principle of the challenge is really simple. You have to obtain more than 250 upvotes to get the flag. But each user can vote once.
+
+So to solve this challenge you just have to create 250 users activate them (a user is activated using a link sent by mail) and vote for the same user. Then you just login with this user and get the flag.
+
+## The normal way
+
+I've started to put all the pieces together, use the Google gmail API to get the mail and activate the user. A captcha is required on register but the answer of the captcha is in the HTML source code.
+
+So I had all the pieces to launch my exploit and was ready to go. Then I thought a little bit and came out with another (funnier) way to solve the challenge...
+
+## The hacker way
+
+As you see, solving this challenge is quite straight-forward and when you start to write your exploit you have to choose a random username/email/password. What I used was :
+
+```python
+rndm = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(N))
+username = rndm
+password = rndm
+email = "myname+" + rndm + "@hugodelval.com"
+```
+
+Then I thought that somebody might already have writen this code before me and created a user with a password==username ?? Maybe this user already have (upvotes > 250) and then already have the flag ?
+
+So I looked for all the users who have more than 250 upvotes and tried their username as their password, and indeed it worked ! Thanks to the user **ttt** for providing me with the flag ;)
+
