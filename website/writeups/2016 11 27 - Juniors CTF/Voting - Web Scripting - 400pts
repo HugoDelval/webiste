@@ -1,10 +1,10 @@
 # Writeup for the Just In Time's Hack The Vote chall
 
-**Keywords**: LFI, PHP, unserialize, time sensible
+**Keywords**: Web scripting, weak passwords
 
-**Category**: Web
+**Category**: Web, programming
 
-**Points**: 300
+**Points**: 400
 
 > When Uncle Stan decides to run for mayor, Dipper and Mabel had to deal with the transformation of his hapless uncle in this candidate.
 
