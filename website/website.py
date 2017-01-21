@@ -75,7 +75,7 @@ def send_mail():
         response["msg"] = "Your email is empty or invalid."
     if not isinstance(message, str) or len(message) < 10 or len(message) > 10000:
         response["msg"] = "Your email is either too short or too long."
-    if response["msg"]:
+    if response.get("msg"):
         resp = jsonify(**response)
         resp.status_code = 500
         return resp
