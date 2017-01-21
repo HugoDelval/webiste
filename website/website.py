@@ -70,11 +70,15 @@ def send_mail():
     sender = request.form['sender'].encode('ascii',errors='ignore').decode('ascii')
     receiver = 'hugodelval@gmail.com'
     message = request.form['message'].encode('ascii',errors='ignore').decode('ascii')
-    response = {"msg" : "An error occurred while sending mail."}
     if not isinstance(sender, str) or not re.match(r'[^@\s]+@[^@\s]+\.[^@\s]+', sender):
         response["msg"] = "Your email is empty or invalid."
     if not isinstance(message, str) or len(message) < 10 or len(message) > 10000:
         response["msg"] = "Your email is either too short or too long."
+    if response["msg"]:
+        resp = jsonify(**response)
+        resp.status_code = 500
+        return resp
+    response = {"msg" : "An error occurred while sending mail."}
     msg = MIMEText(message)
     msg['Subject'] = "New message from Website"
     msg['From'] = sender
