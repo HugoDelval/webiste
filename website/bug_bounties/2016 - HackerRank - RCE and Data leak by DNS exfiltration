@@ -72,4 +72,4 @@ What the exploit does is a DNS request of the form `command | base64`.dns.hugode
 
 ## Solution
 
-The IT team solved this issue in 3 days (reported the 7th Nov. 2017 and fixed the 10th)! They disabled DNS lookup altogether.
+The IT team solved this issue in 3 days (reported the 7th Nov. 2016 and fixed the 10th)! They disabled DNS lookup altogether.
