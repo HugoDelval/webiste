@@ -1,10 +1,7 @@
 {% extends "layout.html" %}
 
-{% if type == 0 %}
-    {% block nav_writeup %}active{% endblock %}
-{% elif type == 1 %}
-    {% block nav_bugbounty %}active{% endblock %}
-{% endif %}
+{% block nav_writeup %}{% if type == 0 %}active{% endif %}{% endblock %}
+{% block nav_bugbounty %}{% if type == 1 %}active{% endif %}{% endblock %}
 
 {% block css %}
     <link rel="stylesheet" type="text/css" href="https://highlightjs.org/static/demo/styles/androidstudio.css">
