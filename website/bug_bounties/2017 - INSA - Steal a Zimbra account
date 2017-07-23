@@ -26,7 +26,9 @@ As you can see when you get redirected to the CAS, the URL looks strange: https:
 
 The **service** query param is the url where CAS will redirect you after a successful login. You can see in this URL a query param called *jsessionid* which turns out to be a session identifier. 
 
-So if the attacker sends the [previous URL](https://login.insa-lyon.fr/cas/login?service=https%3A%2F%2Flogin.insa-lyon.fr%2Fzimbra%2Flogin%3Bjsessionid%3D03DCE365AD293766310EF30978C848BD.dsi68%3Fversion%3Dpreferred) to a victim and that the victim logs in, the victim will be redirected to Zimbra and Zimbra will get the jsessionid from the URL and trust this as the actual session ID.
+To generate an URL like this (with its jsession token), an attacker just has to do [step 2 of **Context**](#context).
+
+So if the attacker sends the [generated URL with his jsession token](https://login.insa-lyon.fr/cas/login?service=https%3A%2F%2Flogin.insa-lyon.fr%2Fzimbra%2Flogin%3Bjsessionid%3D03DCE365AD293766310EF30978C848BD.dsi68%3Fversion%3Dpreferred) to a victim and that the victim logs in, the victim will be redirected to Zimbra. Zimbra will fetch the jsessionid from the URL and trust this as the actual session ID.
 
 The attacker then visits the **service** url (https://login.insa-lyon.fr/zimbra/login;jsessionid=03DCE365AD293766310EF30978C848BD.dsi68?version=preferred), and he will be identified by Zimbra as its victim.
 
