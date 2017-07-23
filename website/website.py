@@ -1,21 +1,24 @@
-import os, sys
+import os
+import re
+import smtplib
+import sys
+
+from os import listdir
+from os.path import join, isfile, isdir, basename
+from datetime import date
 from email.mime.text import MIMEText
 from sqlite3 import dbapi2 as sqlite3
-
-from datetime import date
-
-import re
-from flask import Flask, request, session, g, redirect, url_for, abort, \
+from flask import Flask, request, g, abort, \
      render_template, jsonify
 
-import smtplib
-import skills, secrets
+import secrets
+import skills
 
 app = Flask(__name__)
 
 # Load default config
 app.config.update(dict(
-    DATABASE=os.path.join(app.root_path, 'website.db'),
+    DATABASE=join(app.root_path, 'website.db'),
     DEBUG=True,
     SECRET_KEY=secrets.key,
 ))
@@ -47,7 +50,7 @@ def get_db():
 
 
 @app.teardown_appcontext
-def close_db(error):
+def close_db(_):
     """Closes the database again at the end of the request."""
     if hasattr(g, 'sqlite_db'):
         g.sqlite_db.close()
@@ -67,9 +70,9 @@ def index():
 
 @app.route('/contact', methods=['POST'])
 def send_mail():
-    sender = request.form['sender'].encode('ascii',errors='ignore').decode('ascii')
+    sender = request.form['sender'].encode('ascii', errors='ignore').decode('ascii')
     receiver = 'hugodelval@gmail.com'
-    message = request.form['message'].encode('ascii',errors='ignore').decode('ascii')
+    message = request.form['message'].encode('ascii', errors='ignore').decode('ascii')
     response = {}
     if not isinstance(sender, str) or not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', sender):
         response["msg"] = "Your email is empty or invalid."
@@ -102,40 +105,51 @@ def send_mail():
     return resp
 
 
-@app.route('/writeup', methods=['GET'])
-def ctfs():
-    writeups_dirs = [d for d in os.listdir("writeups") if os.path.isdir(os.path.join("writeups", d))]
-    return render_template('ctfs.html', writeups=sorted(writeups_dirs, reverse=True))
-
-@app.route('/writeup/<ctf>', methods=['GET'])
-def writeup_dir(ctf):
-    if not re.match(r'^[ \w.-]+$', ctf):
-        abort(403)
-    if re.search(r'\.\.', ctf):
-        abort(403)
-    if not os.path.isdir(os.path.join("writeups", ctf)):
-        abort(404)
-    writeups = [f for f in os.listdir(os.path.join("writeups", ctf)) if os.path.isfile(os.path.join("writeups", ctf, f))]
-    return render_template('writeups.html', writeups=writeups, ctf=ctf)
+@app.route('/writeups', methods=['GET'])
+def writeups():
+    writeups_dirs = [join(app.root_path, "writeups", d) for d in listdir(join(app.root_path, "writeups")) if isdir(join(app.root_path, "writeups", d))]
+    writeups = sum(map(lambda d: [(basename(d), f) for f in listdir(d) if isfile(join(d, f))], writeups_dirs), [])
+    return render_template('ctfs.html', writeups=sorted(writeups, reverse=True))
 
 
 @app.route('/writeup/<ctf>/<writeup>', methods=['GET'])
 def writeup(ctf, writeup):
     if not re.match(r'^[ \w.-]+$', ctf):
         abort(403)
-    if re.search(r'\.\.', ctf):
-        abort(403)
-    if not os.path.isdir(os.path.join("writeups", ctf)):
+    if not isdir(join(app.root_path, "writeups", ctf)):
         abort(404)
     if not re.match(r'^[ \w.-]+$', writeup):
         abort(403)
-    if re.search(r'\.\.', writeup):
-        abort(403)
-    writeup_path = os.path.join("writeups", ctf, writeup)
-    if not os.path.isfile(writeup_path):
+    writeup_path = join(app.root_path, "writeups", ctf, writeup)
+    if not isfile(writeup_path):
         abort(404)
     writeup = open(writeup_path).read()
-    return render_template('writeup.html', writeup=writeup.replace("\\", "\\\\").replace("\n", "\\n").replace("'", "\\'"), ctf=ctf)
+    return render_template('writeup.html',
+                           writeup=writeup.replace("\\", "\\\\").replace("\n", "\\n").replace("'", "\\'"),
+                           return_text="Back to the writeup list",
+                           return_url="/writeups",
+                           type=0)
+
+
+@app.route('/bug_bounties', methods=['GET'])
+def bug_bounties():
+    bug_bounties = [f for f in listdir(join(app.root_path, "bug_bounties")) if isfile(join(app.root_path, "bug_bounties", f))]
+    return render_template('bugbounties.html', bugbounties=sorted(bug_bounties, reverse=True))
+
+
+@app.route('/bug_bounties/<bb_name>', methods=['GET'])
+def bug_bounty(bb_name):
+    if not re.match(r'^[ \w.-]+$', bb_name):
+        abort(403)
+    bb_path = join(app.root_path, "bug_bounties", bb_name)
+    if not isfile(bb_path):
+        abort(404)
+    writeup = open(bb_path).read()
+    return render_template('writeup.html',
+                           writeup=writeup.replace("\\", "\\\\").replace("\n", "\\n").replace("'", "\\'"),
+                           return_text="Back to the bug bounty list",
+                           return_url="/bug_bounties",
+                           type=1)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,25 @@
+{% extends "layout.html" %}
+
+{% block nav_bugbounty %}active{% endblock %}
+
+{% block body %}
+
+<section class="jumbotron">
+    <h1>Bug Bounties' Writeups</h1>
+</section>
+
+<section>
+    <h2 style="padding-top:10px;">List of Bug Bounties</h2>
+    <ul class="well">
+    {% for bb in bugbounties %}
+        <li style="margin: 10px">
+            {% set bb_name = '-'.join(bb.split('-')[1:]) %}
+            {% set bb_date = bb.split(' - ')[0] %}
+            <b><a href="/bug_bounties/{{ bb }}">{{ bb_name }}</a></b> &nbsp; (<i>{{ bb_date }}</i>)
+        </li>
+    {% endfor %}
+    </ul>
+</section>
+
+{% endblock %}
+

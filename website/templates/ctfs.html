@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block navwriteups %}active{% endblock %}
+{% block nav_writeup %}active{% endblock %}
 
 {% block body %}
 
@@ -16,11 +16,14 @@
 </section>
 
 <section>
-    <h2 style="padding-top:10px;">List of CTFs</h2>
+    <h2 style="padding-top:10px;">List of writeups</h2>
     <ul class="well">
-    {% for writeup in writeups %}
-        <li>
-            <a href="/writeup/{{writeup}}">{{writeup}}</a>
+    {% for ctf, writeup in writeups %}
+        <li style="margin: 10px">
+            {% set wu_name = '-'.join(writeup.split('-')[:2]) %}
+            {% set ctf_date, ctf_name = ctf.split(' - ') %}
+            {% set ctf_date_formatted = ctf_date.replace(' ', '/') %}
+            <b><a href="/writeup/{{ ctf }}/{{ writeup }}">{{ wu_name }}</a></b> &nbsp; (from <i>{{ ctf_name }}, the {{ ctf_date_formatted }}</i>)
         </li>
     {% endfor %}
     </ul>

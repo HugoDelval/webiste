@@ -1,0 +1,37 @@
+# INSA (National Institute of Applied Sciences) bug bounty
+
+My university (INSA) finally opened its bug bounty! That's a huge step for the small IT team of the university. [The platform](https://jumplyn.com) has been built by two awesome teachers, François Lesueur and Stéphane Frénot.
+
+## Context
+
+At INSA we use a webmail called [*Zimbra*](https://en.wikipedia.org/wiki/Zimbra). We also use a system called [CAS](https://en.wikipedia.org/wiki/Central_Authentication_Service) (Central Authentication Service) which is a is a single sign-on protocol.
+
+Here is the Zimbra login process:
+
+1. A user visits the Zimbra webpage: [https://zmail.insa-lyon.fr/zimbra/](https://zmail.insa-lyon.fr/zimbra/)
+<br>![zimbra](/static/images/bug_bounty/zimbra_login_step1.png)
+
+2. Then clicks on "Se connecter" ("log in", in french), the user gets redirected to the CAS (url -> https://login.insa-lyon.fr/cas/login?service=https%3A%2F%2Flogin.insa-lyon.fr%2Fzimbra%2Flogin%3Bjsessionid%3D03DCE365AD293766310EF30978C848BD.dsi68%3Fversion%3Dpreferred):
+<br>![cas](/static/images/bug_bounty/zimbra_login_step2.png)
+
+3. The user enters its credentials and gets redirected to Zimbra
+
+## The bug
+
+By sending a valid INSA link (which looks legit as it is from a real "insa-lyon.fr" domain) to someone having a Zimbra account, it is possible to steal the Zimbra session of this person.
+
+## Why the bug happened ?
+
+As you can see when you get redirected to the CAS, the URL looks strange: https://login.insa-lyon.fr/cas/login?service=https%3A%2F%2Flogin.insa-lyon.fr%2Fzimbra%2Flogin%3Bjsessionid%3D03DCE365AD293766310EF30978C848BD.dsi68%3Fversion%3Dpreferred
+
+The **service** query param is the url where CAS will redirect you after a successful login. You can see in this URL a query param called *jsessionid* which turns out to be a session identifier. 
+
+So if the attacker sends the [previous URL](https://login.insa-lyon.fr/cas/login?service=https%3A%2F%2Flogin.insa-lyon.fr%2Fzimbra%2Flogin%3Bjsessionid%3D03DCE365AD293766310EF30978C848BD.dsi68%3Fversion%3Dpreferred) to a victim and that the victim logs in, the victim will be redirected to Zimbra and Zimbra will get the jsessionid from the URL and trust this as the actual session ID.
+
+The attacker then visits the **service** url (https://login.insa-lyon.fr/zimbra/login;jsessionid=03DCE365AD293766310EF30978C848BD.dsi68?version=preferred), and he will be identified by Zimbra as its victim.
+
+So an attacker could generate thousands of different session ID (by repeating [step 2 of **Context**](#context)), and then sends each of these URLs to the INSA students/teachers and steal hundreds of Zimbra sessions.
+
+## Solution
+
+The IT team solved this issue in less than 24hours in the middle of summer, congratz! They just removed the jsessionid from the URL and told Zimbra to trust the cookie JSESSION ID to identify the session.

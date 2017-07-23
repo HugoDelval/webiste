@@ -1,0 +1,43 @@
+# CLOUDFLARE bug bounty
+
+## Bug 1 - Bad input validation - Context
+
+In the CloudFlare API, you can update your page rules using a PUT request : https://api.cloudflare.com/#page-rules-for-a-zone-update-a-page-rule
+
+You can specify actions, for example "Edge Cache Expire TTL" (https://blog.cloudflare.com/edge-cache-expire-ttl-easiest-way-to-override/) which specifies how long a page should be cached before asking the backend server again. 
+
+As said in the CloudFlare blog, you cannot use less than 2 hours with a free pack. If you need CloudFlare to check for a live version more often, you will need to upgrade to a premium pack. The smallest TTL you want, the more you need to pay.
+
+## Bug 1 - Bad input validation - Exploitation
+
+The catch is that there is a lack of verification in the backend. The frontend knows that you are using a free pack but the backend seems to not care at all.
+
+So by using the API I was able to specify 30seconds, which is only available for an Entreprise pack (-> $$$).
+
+![30s](/static/images/bug_bounty/cloudflare_30s.png)
+
+I've tested on my own website and the 30s TTL is effectively active.
+
+## Bug 1 - Bad input validation - Response from the team
+
+I've alerted the cloudflare team through HackerOne the 9th of March 2017 and they responded the 27th that "this isn't a security problem". Today, 23th July 2017 I'm publicly disclosing the bug.
+
+IMHO it's not a big security bug but it still is one -> [A7 on Owasp 2016 Top10 "Missing Function Level Access Control"](https://www.veracode.com/directory/owasp-top-10)
+
+## Bug 2 - Race condition - Context
+
+Same context as bug 1, you can add only 3 cache rules when using a free pack, and you would need to pay to use more than 3 rules.
+
+## Bug 2 - Race condition - Exploitation
+
+By using a race condition (sending several POST requests at the same time) it's possible to add more than 3 rules. With a little python script and a home internet connection I was able to create 6 caches rules. Note that we should be able to add more if we optimize the script and use a better internet connection.
+
+Note that my script is based on https://github.com/andresriancho/race-condition-exploit which is a great little project :)
+
+I've tested and all my page rules are effectively actives.
+
+![race condition](/static/images/bug_bounty/cloudflare_racecondition.png)
+
+## Bug 2 - Race condition - Response from the team
+
+The bug was a duplicate one according to the cloudflare team.

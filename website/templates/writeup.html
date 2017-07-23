@@ -1,6 +1,11 @@
 {% extends "layout.html" %}
 
-{% block navwriteups %}active{% endblock %}
+{% if type == 0 %}
+    {% block nav_writeup %}active{% endblock %}
+{% elif type == 1 %}
+    {% block nav_bugbounty %}active{% endblock %}
+{% endif %}
+
 {% block css %}
     <link rel="stylesheet" type="text/css" href="https://highlightjs.org/static/demo/styles/androidstudio.css">
 {% endblock %}
@@ -9,7 +14,7 @@
 {% block body %}
 
 <h2 class="nopadding">
-    <a href="/writeup/{{ctf}}">&#8592; Back to <b>{{ctf}}</b></a>
+    <a href="{{ return_url }}">&#8592; {{ return_text }}</a>
 </h2>
 
 <div id="writeup" class="well"></div>
