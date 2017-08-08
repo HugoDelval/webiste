@@ -14,7 +14,7 @@ The catch is that there is a lack of verification in the backend. The frontend k
 
 So by using the API I was able to specify 30seconds, which is only available for an Entreprise pack (-> $$$).
 
-![30s](/static/images/bug_bounty/cloudflare_30s.png)
+<img src="/static/images/bug_bounty/cloudflare_30s.png" alt="30s" class="img-responsive img-thumbnail">
 
 I've tested on my own website and the 30s TTL is effectively active.
 
@@ -36,7 +36,7 @@ Note that my script is based on https://github.com/andresriancho/race-condition-
 
 I've tested and all my page rules are effectively actives.
 
-![race condition](/static/images/bug_bounty/cloudflare_racecondition.png)
+<img src="/static/images/bug_bounty/cloudflare_racecondition.png" alt="race condition" class="img-responsive img-thumbnail">
 
 ## Bug 2 - Race condition - Response from the team
 
