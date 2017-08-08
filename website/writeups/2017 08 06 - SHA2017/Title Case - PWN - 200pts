@@ -1,6 +1,6 @@
 # Writeup for the `Title Case` chall from the SHA2017 CTF
 
-It's been a long time since the last writeup I did on this website. Let's remedy thi. The last week-end we played the SHA2017 CTF which was freaking awesome! One of the best CTF of the year in my opinion.
+It's been a long time since the last writeup I did on this website. Let's remedy this. The last week-end we played the SHA2017 CTF which was freaking awesome! One of the best CTF of the year in my opinion.
 
 We ended up at the 12th position, which is quite a good score for us :) And I did **2 PWNs**! (That's pretty uncommon) Here is the first one (solved 7 times).
 
@@ -63,7 +63,7 @@ name_function == name_function.title()
 
 And we got some... But nothing useful.
 
-Mmh we might need to think out side the box.
+Mmh we might need to think outside the box.
 
 ## Illumination
 
