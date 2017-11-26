@@ -3,57 +3,22 @@ import re
 import smtplib
 import sys
 
-from os import listdir
+from os import listdir, getenv
 from os.path import join, isfile, isdir, basename
 from datetime import date
 from email.mime.text import MIMEText
-from sqlite3 import dbapi2 as sqlite3
-from flask import Flask, request, g, abort, \
-     render_template, jsonify
+from flask import Flask, request, g, abort, render_template, jsonify
 
 import secrets
 import skills
 
 app = Flask(__name__)
-
-# Load default config
 app.config.update(dict(
-    DATABASE=join(app.root_path, 'website.db'),
-    DEBUG=True,
-    SECRET_KEY=secrets.key,
+    DEBUG=False,
+    SECRET_KEY=secrets.token_hex(40),
 ))
-
-
-def connect_db():
-    """Connects to the specific database."""
-    rv = sqlite3.connect(app.config['DATABASE'])
-    rv.row_factory = sqlite3.Row
-    return rv
-
-
-def init_db():
-    """Initializes the database."""
-    with app.app_context():
-        db = get_db()
-        with app.open_resource('schema.sql', mode='r') as f:
-            db.cursor().executescript(f.read())
-        db.commit()
-
-
-def get_db():
-    """Opens a new database connection if there is none yet for the
-    current application context.
-    """
-    if not hasattr(g, 'sqlite_db'):
-        g.sqlite_db = connect_db()
-    return g.sqlite_db
-
-
-@app.teardown_appcontext
-def close_db(_):
-    """Closes the database again at the end of the request."""
-    if hasattr(g, 'sqlite_db'):
-        g.sqlite_db.close()
+passwd = getenv("google_passwd")
+assert passwd is not None and passwd != ""
 
 
 def calculate_age(born):
@@ -91,10 +56,10 @@ def send_mail():
     try:
         s = smtplib.SMTP('smtp.gmail.com:587')
         s.starttls()
-        s.login('hugodelval@gmail.com', secrets.passwd)
+        s.login('hugodelval@gmail.com', passwd)
         s.sendmail(sender, [receiver], msg.as_string())
         s.quit()
-        response["msg"] = "Thank you for taking the time to send me this mail. I will answer as fast as possible."
+        response["msg"] = "Thank you for taking the time to send me this email. I will answer as fast as possible."
         resp = jsonify(**response)
         resp.status_code = 200
     except Exception as e:
@@ -153,10 +118,4 @@ def bug_bounty(bb_name):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2 or sys.argv[1] not in ["initdb", "run"]:
-        print("Need 1 argument from (initdb, run)", file=sys.stderr)
-        sys.exit(1)
-    if sys.argv[1] == "initdb":
-        init_db()
-    elif sys.argv[1] == "run":
-        app.run()
+    app.run()

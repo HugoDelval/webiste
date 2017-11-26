@@ -1,2 +1,0 @@
-passwd="FIXME"
-key="FIXME"
