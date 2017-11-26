@@ -1,0 +1,384 @@
+# Writeup for the `Crypto Clock` chall from TUCTF2017
+
+
+**Keywords**: Python, RSA
+
+**Category**: Crypto
+
+**Points**: 300
+
+> These damn hackers have hit our NTP server with something called crypto clock...
+
+> Our sysadmin found these suspicious packets just before our systems went down.
+
+> Can you get back in???
+
+> nc cryptoclock.tuctf.com 1230
+
+> MD5 (network_dump) = bdfcfee713b6ad53f4923f96863e385c
+
+> UPDATE: The server side code is running Python 2
+
+Note that I didn't see the *UPDATE* while pwning the chall, but we will see why this is so important.
+
+## The goal
+
+I won't give you the network dump because it's only a way to provide the source code. Opening it with wireshark gave us a base64encoded string which decodes to the following python file:
+
+```python
+#!/usr/bin/env python
+import sys
+import random
+import arrow
+
+big_1=44125640252420890531874960299151489144331823129767199713521591380666658119888039423611193245874268914543544757701212460841500066756559202618153643704131510144412854121922874915334989288095965983299150884589072558175944926880089918837606946144787884895502736057098445881755704071137014578861355153558L
+big_2=66696868460135246134548422790675846019514082280010222055190431834695902320690870624800896599876321653748703472303898494328735060007496463688173184134683195070014971393479052888965363156438222430598115999221042866547813179681064777805881205219874282594291769479529691352248899548787766385840180279125343043041L
+
+
+flag = "THEFLAG"
+keys = {
+    "n":142592923782837889588057810280074407737423643916040668869726059762141765501708356840348112967723017380491537652089235085114921790608646587431612689308433796755742900776477504777927984318043841155548537514797656674327871309567995961808817111092091178333559727506289043092271411929507972666960139142195351097141,
+    "e": 3
+}
+
+#now to get some randomness in here!
+with open('/dev/urandom', 'rb') as f:
+    rand = f.read(8)
+
+rand_int = int(rand.encode('hex'),16)
+
+#now lets use something easier.
+random.seed(rand_int)
+
+offset = random.randint(big_1,big_2)
+
+while True:
+    sys.stdout.write( '''Welcome to the ntp server
+What would you like to do?
+    1) get current time
+    2) enter admin area
+    3) exit
+:''')
+    sys.stdout.flush()
+    response = raw_input('')
+    if response == '1':
+        time = arrow.utcnow().timestamp + offset
+        enc_time = pow(time,keys['e'],keys['n'])
+        sys.stdout.write('HAHAHAHAHAHA, this NTP server has been taken over by hackers!!!\n')
+        sys.stdout.write('here is the time encrypted with sweet RSA!\n')
+        sys.stdout.write(str(enc_time))
+        sys.stdout.write('\n')
+        sys.stdout.flush()
+    elif response == '2':
+        # lets get even more random!
+        time = arrow.utcnow().timestamp + offset
+        random.seed(time)
+        guessing_int = random.randint(0,999999999999)
+        sys.stdout.write('''ACCESS IS ONLY FOR TRUE HACKERS!
+to prove you are a true hacker, predict the future:''')
+        sys.stdout.flush()
+        response = raw_input('')
+        if response == str(guessing_int):
+            sys.stdout.write('''Wow, guess you are a hacker.\n''')
+            sys.stdout.write(flag)
+            sys.stdout.write('\n')
+            break
+        else:
+            sys.stdout.write('''I knew you weren't a hacker''')
+            sys.stdout.write('\n')
+            break
+    else:
+        print 'Good by.'
+        break
+```
+
+So what's our goal here? We need to guess a random integer. This integer is generated using a pseudo-random generator, so if we are able to get the seed, we can easily derivate the secret integer.
+
+```python
+random.seed(time)
+guessing_int = random.randint(0,999999999999)
+```
+
+So if we are able to guess what `time` is, we will get the flag.
+
+```python
+time = arrow.utcnow().timestamp + offset
+```
+
+Let's assume that the server is on time, we only need the `offset` to get the flag.
+
+`offset` is generated from a real random source (unix `/dev/urandom`) and is in a big range, so bruteforce is out of the question.
+
+We obviously need to interact with the server to deduce this `offset`, but how?
+
+## Information leakage
+
+```python
+time = arrow.utcnow().timestamp + offset
+enc_time = pow(time, keys['e'], keys['n'])
+# ...
+sys.stdout.write(str(enc_time))
+```
+
+We are given the RSA-encrypted `time`, so one way to get the `time` would be to factorise the `n`. After some quick unfructuous tries ([factordb.com](http://factordb.com), ...), I gave up this idea, it would be too simple for a 300pts chall and the `n` looked robust enough.
+
+Let's call `time_0` the time at which we connect to the server, if each second we ask for the `enc_time` we will have this relations:
+
+```bash
+enc_time_0 = RSA(offset + time_0)
+enc_time_1 = RSA(offset + time_1) = RSA(offset + time_0 + 1)
+enc_time_2 = RSA(offset + time_2) = RSA(offset + time_0 + 2)
+# ...
+```
+
+We have a link between the cleartexts :D Which is never good in RSA (I think, [please correct me](http://hugodelval.com/#contact) if I'm wrong)
+
+## Some math
+
+Let's do some "easy" math:
+
+```bash
+enc_time_0 = RSA(offset + time_0) = (offset + time_0)^3 [n]
+enc_time_1 = (offset + time_0 + 1)^3 [n]
+enc_time_2 = (offset + time_0 + 2)^3 [n]
+enc_time_3 = (offset + time_0 + 3)^3 [n]
+enc_time_4 = (offset + time_0 + 4)^3 [n]
+```
+
+Let's say that `X = offset + time_0`, then we have:
+
+```bash
+(1) enc_time_0 = X^3
+(2) enc_time_1 = (X + 1)^3 = X^3 + 3X^2 + 3X   + 1  [n]
+(3) enc_time_2 = (X + 2)^3 = X^3 + 6X^2 + 12X  + 8  [n]
+(4) enc_time_3 = (X + 3)^3 = X^3 + 9X^2 + 27X  + 27 [n]
+(5) enc_time_4 = (X + 4)^3 = X^3 + 12X^2 + 48X + 64 [n]
+```
+
+Each one of the previous equations is too complex to solve individually because `X^3` and `X^2` are way bigger than `n`
+
+So finding `X` would be the same as enumerating every integer between [0, n], and checking if it solves the equation, it is not feasable.
+
+The trick is to combine these equations, for example we can easily remove the `X^3` by computing `(2) - (1)`:
+
+```bash
+enc_time_1 - enc_time_0 = 3X^2 + 3X + 1 [n]
+```
+
+But we still have some `X^2` left, so it's not good enough. But if we compute `(2) + (5) - (3) - (4)`, we end up with:
+
+```bash
+enc_time_1 + enc_time_4 - enc_time_2 - enc_time_3 = 12X + 30 [n]
+```
+
+Which we can solve easily!!
+
+## Fail, debug, fail, debug... and PWN
+
+When writing my exploit I came across a lot of complications, the first one being that I'm using python3 as my scripting language and that python2's `random` is different from python3's
+
+It can be easily proven by doing this:
+
+```bash
+python2 -c 'import random;random.seed(123);print random.randint(0,123456789)'  # outputs 6464641
+python3 -c 'import random;random.seed(123);print(random.randint(0,123456789))' # outputs 7028123
+```
+
+It took me a long time to get why my code was failing and I figured it out because of the last instruction in the server code:
+
+```python
+print 'Good by.'
+```
+
+Which is only valid in python2!
+
+I had to debug my code, so I launched the server using:
+
+```bash
+socat -v tcp-l:1234,fork exec:"python clock.py"
+```
+
+This way I could test my exploit and know exactly at which step I was wrong
+
+I also added some logging in the server code:
+
+```python
+def log(string):
+    with open("/tmp/log", "a") as f:
+        f.write(string + "\n")
+
+log("here :)")
+```
+
+```bash
+touch /tmp/log && tail -f /tmp/log
+```
+
+This way I was able to easily debug, and not blindly exploit the server.
+
+## The exploit
+
+Let's write a exploit code step by step.
+
+```python
+from pwn import *
+
+r = remote("cryptoclock.tuctf.com", 1230)
+# r = remote("127.0.0.1", 1234) # for debugging purposes
+```
+
+Easy enough, just connect to the remote server.
+
+```python
+def read_menu(r):
+	r.readline()
+	r.readline()
+	r.readline()
+	r.readline()
+	r.readline()
+
+def read_ntp_fake(r):
+	r.readline()
+	r.readline()
+```
+
+Some handy method, which read the server's crap
+
+```python
+def remove_duplicates(res):
+	final = []
+	last_one = -1
+	for i in sorted(res, key=lambda x:x[0].timestamp):
+		if i[0].timestamp == last_one:
+			continue
+
+		last_one = i[0].timestamp
+		final.append(i)
+
+	final_filtered = sorted(final, key=lambda x:x[0].timestamp)
+	return final_filtered[:5]
+
+
+timestamp_connection_utc = int(arrow.utcnow().timestamp)
+res = []
+while int(arrow.utcnow().timestamp) < timestamp_connection_utc + 7:
+	read_menu(r)
+	r.sendline("1")
+	read_ntp_fake(r)
+	fake_time = int(r.readline().decode().strip())
+	res.append((arrow.utcnow(), fake_time))
+	time.sleep(0.4)
+
+enc_time0, enc_time1, enc_time2, enc_time3, enc_time4 = remove_duplicates(res)
+```
+
+A loot of bad code ^^, basically just querying 5 consecutives timestamps and their corresponding `enc_time`, building a list `[(timestamp_utc, enc_time)]`, example:
+
+`enc_time0, enc_time1, enc_time2, enc_time3, enc_time4 = [(1000000, AAA), (1000001, BBB), (1000002, CCC), (1000003, DDD), (1000004, EEE)]`
+
+```python
+X = (enc_time1[1] + enc_time4[1] - enc_time2[1] - enc_time3[1] - 30) % n
+while X % 12 != 0:
+	X += n
+
+time0 = int((X//12) % n)
+```
+
+Solving the equation, and deducing the initial `time0`, which is `timestamp_connection_utc + offset`
+
+```python
+offset = time0 - timestamp_connection_utc
+assert enc_time0[1] == pow((timestamp_connection_utc + offset), 3, n)
+```
+
+We can now derivate the offset!! And we check that we can calculate the same encrypted time as the server (if not, we messed up somewhere)
+
+Now let's ask for the flag :)
+
+```python
+time = arrow.utcnow().timestamp + offset
+guessing_int = subprocess.check_output(["python2", "-c", "import random;random.seed({});print random.randint(0,999999999999)".format(time)]).decode().strip()
+
+read_menu(r)
+r.sendline("2")
+r.readline()
+r.sendline(guessing_int)
+print(r.readline())
+print(r.readline())
+print(r.readline())
+```
+
+And the job is done! Here is the full exploit:
+
+```python
+import time
+import arrow
+import subprocess
+from pwn import *
+
+n = 142592923782837889588057810280074407737423643916040668869726059762141765501708356840348112967723017380491537652089235085114921790608646587431612689308433796755742900776477504777927984318043841155548537514797656674327871309567995961808817111092091178333559727506289043092271411929507972666960139142195351097141
+r = remote("cryptoclock.tuctf.com", 1230)
+# r = remote("127.0.0.1", 1234)
+
+def read_menu(r):
+	r.readline()
+	r.readline()
+	r.readline()
+	r.readline()
+	r.readline()
+
+def read_ntp_fake(r):
+	r.readline()
+	r.readline()
+
+
+def remove_duplicates(res):
+	final = []
+	last_one = -1
+	for i in sorted(res, key=lambda x:x[0].timestamp):
+		if i[0].timestamp == last_one:
+			continue
+
+		last_one = i[0].timestamp
+		final.append(i)
+
+	final_filtered = sorted(final, key=lambda x:x[0].timestamp)
+	return final_filtered[:5]
+
+
+timestamp_connection_utc = int(arrow.utcnow().timestamp)
+res = []
+while int(arrow.utcnow().timestamp) < timestamp_connection_utc + 7:
+	read_menu(r)
+	r.sendline("1")
+	read_ntp_fake(r)
+	fake_time = int(r.readline().decode().strip())
+	res.append((arrow.utcnow(), fake_time))
+	time.sleep(0.4)
+
+enc_time0, enc_time1, enc_time2, enc_time3, enc_time4 = remove_duplicates(res)
+
+X = (enc_time1[1] + enc_time4[1] - enc_time2[1] - enc_time3[1] - 30) % n
+while X % 12 != 0:
+	X += n
+
+time0 = int((X//12) % n)
+offset = time0 - timestamp_connection_utc
+assert enc_time0[1] == pow((timestamp_connection_utc + offset), 3, n)
+
+time = arrow.utcnow().timestamp + offset
+guessing_int = subprocess.check_output(["python2", "-c", "import random;random.seed({});print random.randint(0,999999999999)".format(time)]).decode().strip()
+
+read_menu(r)
+r.sendline("2")
+r.readline()
+r.sendline(guessing_int)
+print(r.readline())
+print(r.readline())
+print(r.readline())
+print(r.readline())
+```
+
+`TUCTF{g00d_th1ng_th3_futur3_i5_r3lated!}`
+
+Crypto is really a weird thing, even when you try to use standard algo (RSA), you can mess up really easily.
